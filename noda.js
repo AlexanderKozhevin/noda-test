@@ -167,28 +167,39 @@ Noda.clearMap = async function (props) {
 }
 
 Noda.sendMessage = async function(messageType, messageId, messageData) {
-    return new Promise(function (resolve, reject) {
+  return new Promise(function (resolve, reject) {
 
-        var messageId = uuidv4();
+    // ❗ НЕ генерим новый messageId — используем тот, что пришёл
+    // var messageId = uuidv4();  // <-- УДАЛИТЬ
 
-        window.noda.MessageProcessingQueue[messageId] = function (response) {
-            window.noda.MessageProcessingQueue[messageId] = null;
+    const timeoutMs = 15000;
+    const timer = setTimeout(() => {
+      if (window.noda.MessageProcessingQueue[messageId]) {
+        window.noda.MessageProcessingQueue[messageId] = null;
+        reject(`Timeout waiting response for ${messageType} (${messageId})`);
+      }
+    }, timeoutMs);
 
-            if(response.messageStatus == "Success") {
-                if(response.messageData != null)
-                    resolve(response.messageData);
-                else   
-                    resolve(response.messageStatus)
-            } else
-                reject(response.messageStatus);
-        }
+    window.noda.MessageProcessingQueue[messageId] = function (response) {
+      clearTimeout(timer);
+      window.noda.MessageProcessingQueue[messageId] = null;
 
-        try {                
-            window.vuplex.postMessage({ messageType: messageType, messageId: messageId, messageData: messageData });
-        } catch(ex) {
-            reject("Could not send message: " + ex);
-        }
-    });
+      if (response.messageStatus == "Success") {
+        if (response.messageData != null) resolve(response.messageData);
+        else resolve(response.messageStatus);
+      } else {
+        reject(response.messageStatus);
+      }
+    }
+
+    try {
+      console.log("Sending:", { messageType, messageId, messageData });
+      window.vuplex.postMessage({ messageType, messageId, messageData });
+    } catch(ex) {
+      clearTimeout(timer);
+      reject("Could not send message: " + ex);
+    }
+  });
 }
 
 if (window.vuplex) {
