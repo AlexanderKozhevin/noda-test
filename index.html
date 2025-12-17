@@ -11,13 +11,13 @@
     .ok { background:#e9fbe9; }
     .bad { background:#ffe9e9; }
     .mono { font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; }
-    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #999; background:#f7f7f7; cursor:pointer; }
-    pre { white-space: pre-wrap; word-break: break-word; }
+    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #999; background:#f7f7f7; cursor:pointer; margin-right: 8px; }
+    pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
   </style>
 
-  <!-- ВАЖНО: твоя ссылка -->
+  <!-- ТВОЯ ССЫЛКА (правильный raw path без refs/heads) -->
   <script
-    src="./noda.js"
+    src="https://raw.githubusercontent.com/AlexanderKozhevin/noda-test/main/noda.js"
     onload="window.__nodaJsLoaded=true; window.__log('✅ custom noda.js loaded');"
     onerror="window.__nodaJsError=true; window.__log('❌ custom noda.js failed to load');"
   ></script>
@@ -33,9 +33,17 @@
 
     function __log(msg) {
       const el = $("log");
-      el.textContent = (msg + "\n" + el.textContent).slice(0, 6000);
+      if (!el) return;
+      el.textContent = (msg + "\n" + el.textContent).slice(0, 8000);
     }
     window.__log = __log;
+
+    function withTimeout(p, ms, label="timeout") {
+      return Promise.race([
+        p,
+        new Promise((_, rej) => setTimeout(() => rej(new Error(label)), ms))
+      ]);
+    }
 
     function snapshot() {
       const jsLoaded = !!window.__nodaJsLoaded;
@@ -46,7 +54,7 @@
         <b>Script</b><br/>
         loaded: <span class="mono">${jsLoaded}</span><br/>
         error: <span class="mono">${jsError}</span><br/>
-        src: <span class="mono">raw.githubusercontent.com/.../noda.js</span>
+        src: <span class="mono">raw.githubusercontent.com/AlexanderKozhevin/noda-test/main/noda.js</span>
       `);
 
       setBox("obj", hasNoda, `
@@ -54,9 +62,8 @@
         exists: <span class="mono">${hasNoda}</span>
       `);
 
-      let installed = null;
+      let installed = "(no noda)";
       let installedOk = false;
-
       if (hasNoda) {
         try {
           installed = window.noda.isInstalled();
@@ -70,96 +77,93 @@
         <b>VR context</b><br/>
         isInstalled(): <span class="mono">${String(installed)}</span><br/>
         <div style="margin-top:6px">
-          Если <span class="mono">false</span> — страница открыта НЕ в Noda Browser (или URL запрещён в настройках Noda).
+          <span class="mono">true</span> — страница в контексте Noda. <span class="mono">false</span> — не тот браузер/URL запрещён.
         </div>
       `);
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      __log("DOMContentLoaded");
-
-      // Показываем состояние каждые 300мс первые ~15 секунд
-      let ticks = 0;
-      const t = setInterval(async () => {
-        ticks++;
-        snapshot();
-
-        // Если noda есть и контекст true — попробуем getUser (не обязательно, но полезно)
-        if (window.noda) {
-          try {
-            const installed = window.noda.isInstalled();
-            if (installed === true) {
-              try {
-                const user = await window.noda.getUser();
-                setBox("user", true, `<b>User</b><br/>userId: <span class="mono">${user.userId}</span>`);
-                clearInterval(t);
-              } catch (e) {
-                setBox("user", false, `<b>User</b><br/>getUser error: <span class="mono">${String(e)}</span>`);
-              }
-            }
-          } catch (_) {}
-        }
-
-        if (ticks > 50) clearInterval(t);
-      }, 300);
-
-      // Если вдруг библиотека всё-таки дергает onInitialized — залогируем
-      try {
-        if (window.noda) window.noda.onInitialized = () => __log("✅ onInitialized fired");
-      } catch (_) {}
-    });
-
-    async function createOneNode() {
+    async function safePopulateUser() {
       try {
         if (!window.noda) throw new Error("window.noda missing");
-        if (!window.noda.isInstalled()) throw new Error("isInstalled() is false — not in Noda Browser (or URL not allowed)");
+        if (!window.noda.isInstalled()) throw new Error("isInstalled() = false");
+
+        // Важно: не висим бесконечно
+        const user = await withTimeout(window.noda.getUser(), 1500, "getUser timeout");
+        $("userId").textContent = user.userId;
+        __log("getUser OK: " + user.userId);
+      } catch (e) {
+        $("userId").textContent = "unknown (getUser stalled)";
+        __log("getUser SKIP: " + String(e));
+      }
+    }
+
+    // --- Actions ---
+    async function clearMap() {
+      try {
+        if (!window.noda) throw new Error("window.noda missing");
+        if (!window.noda.isInstalled()) throw new Error("isInstalled() = false");
+        await window.noda.clearMap();
+        __log("clearMap OK");
+      } catch (e) {
+        __log("clearMap ERROR: " + String(e));
+      }
+    }
+
+    // Максимально “в лицо”: relativeTo=User, огромный size
+    async function createOneHugeNode() {
+      try {
+        if (!window.noda) throw new Error("window.noda missing");
+        if (!window.noda.isInstalled()) throw new Error("isInstalled() = false");
 
         const node = await window.noda.createNode({
-          uuid: "smoke:one",
-          title: "SMOKE NODE — MUST BE VISIBLE",
+          uuid: "smoke:visible",
+          title: "Я ДОЛЖЕН БЫТЬ ВИДЕН",
           color: "F44336",
           opacity: 1,
-          shape: "Box",
-          size: 22,
-          notes: "Если видишь эту ноду перед окном — всё работает.",
-          location: { x: 0, y: 0, z: -0.8, relativeTo: "Window" }
+          shape: "Ball",
+          size: 45,
+          notes: "Если видишь это — createNode работает.",
+          location: { x: 0, y: 0, z: -1.0, relativeTo: "User" }
         });
 
-        __log("Created node uuid=" + node.uuid);
+        __log("createNode OK: " + node.uuid);
+        setBox("status", true, `<b>Status</b><br/>Created node: <span class="mono">${node.uuid}</span>`);
       } catch (e) {
         __log("createNode ERROR: " + String(e));
+        setBox("status", false, `<b>Status</b><br/>createNode ERROR: <span class="mono">${String(e)}</span>`);
       }
     }
 
     async function createManyNodes() {
       try {
         if (!window.noda) throw new Error("window.noda missing");
-        if (!window.noda.isInstalled()) throw new Error("isInstalled() is false — not in Noda Browser (or URL not allowed)");
+        if (!window.noda.isInstalled()) throw new Error("isInstalled() = false");
 
-        const N = 150;
+        const N = 120;
         for (let i = 0; i < N; i++) {
-          const row = i % 15;
-          const col = Math.floor(i / 15);
-          const x = (row - 7) * 0.12;
-          const y = col * 0.10;
-          const z = -1.2 - (i % 7) * 0.06;
+          const row = i % 12;
+          const col = Math.floor(i / 12);
+
+          const x = (row - 5.5) * 0.15;
+          const y = (col - 4) * 0.12;
+          const z = -1.5 - (i % 6) * 0.12;
 
           await window.noda.createNode({
-            uuid: "smoke:n" + i,
-            title: "#" + i,
+            uuid: "bulk:n" + i,
+            title: "log #" + i,
             color: (i % 3 === 0) ? "2196F3" : (i % 3 === 1) ? "4CAF50" : "FFB020",
             opacity: 1,
             shape: (i % 4 === 0) ? "Star" : (i % 4 === 1) ? "Diamond" : (i % 4 === 2) ? "Hourglass" : "Box",
-            size: 7,
+            size: 8,
             notes: "bulk " + i,
-            location: { x, y, z, relativeTo: "Window" }
+            location: { x, y, z, relativeTo: "User" } // вокруг тебя
           });
         }
 
         await window.noda.createLink({
-          uuid: "smoke:link",
-          fromUuid: "smoke:n0",
-          toUuid: "smoke:n149",
+          uuid: "bulk:link",
+          fromUuid: "bulk:n0",
+          toUuid: "bulk:n119",
           title: "range",
           color: "171717",
           shape: "Dash",
@@ -169,22 +173,43 @@
           selected: false
         });
 
-        __log("Created " + N + " nodes + 1 link");
+        __log("createMany OK: " + N + " nodes + 1 link");
+        setBox("status", true, `<b>Status</b><br/>Created ${N} nodes + 1 link`);
       } catch (e) {
         __log("createMany ERROR: " + String(e));
+        setBox("status", false, `<b>Status</b><br/>createMany ERROR: <span class="mono">${String(e)}</span>`);
       }
     }
 
-    async function clearMap() {
+    document.addEventListener("DOMContentLoaded", () => {
+      __log("DOMContentLoaded");
+
+      // События (если библиотека их шлёт)
       try {
-        if (!window.noda) throw new Error("window.noda missing");
-        if (!window.noda.isInstalled()) throw new Error("isInstalled() is false — not in Noda Browser (or URL not allowed)");
-        await window.noda.clearMap();
-        __log("clearMap OK");
-      } catch (e) {
-        __log("clearMap ERROR: " + String(e));
-      }
-    }
+        if (window.noda) {
+          window.noda.onNodeCreated = (n) => __log("onNodeCreated uuid=" + n.uuid);
+          window.noda.onLinkCreated = (l) => __log("onLinkCreated uuid=" + l.uuid);
+          window.noda.onInitialized = () => __log("✅ onInitialized fired");
+        }
+      } catch (_) {}
+
+      // Живой статус/снапшот
+      setInterval(snapshot, 300);
+
+      // Если уже есть контекст — пробуем получить user, но не блокируем UI
+      setTimeout(async () => {
+        try {
+          if (window.noda && window.noda.isInstalled && window.noda.isInstalled() === true) {
+            await safePopulateUser();
+            setBox("status", true, `<b>Status</b><br/>Ready. userId: <span class="mono">${$("userId").textContent}</span>`);
+          } else {
+            setBox("status", false, `<b>Status</b><br/>Not ready yet (or isInstalled=false).`);
+          }
+        } catch (e) {
+          __log("init step ERROR: " + String(e));
+        }
+      }, 600);
+    });
   </script>
 </head>
 
@@ -194,14 +219,22 @@
   <div id="script" class="box bad">…</div>
   <div id="obj" class="box bad">…</div>
   <div id="ctx" class="box bad">…</div>
-  <div id="user" class="box bad"><b>User</b><br/>waiting…</div>
+
+  <div id="status" class="box bad">
+    <b>Status</b><br/>
+    waiting…
+  </div>
+
+  <div class="box">
+    <b>User:</b> <span id="userId" class="mono">waiting…</span>
+  </div>
 
   <div class="box">
     <button onclick="clearMap()">Clear map</button>
-    <button onclick="createOneNode()">Create ONE node (Window)</button>
-    <button onclick="createManyNodes()">Create MANY nodes</button>
+    <button onclick="createOneHugeNode()">Create ONE22 huge node (relativeTo=User)</button>
+    <button onclick="createManyNodes()">Create MANY nodes (around User)</button>
     <div style="margin-top:8px; font-size:12px;">
-      Если даже “ONE node” не виден, но ошибок нет — почти всегда <span class="mono">isInstalled() = false</span>.
+      Даже если <span class="mono">getUser</span> зависает — создание нод должно работать. Все ошибки выводятся в лог ниже.
     </div>
   </div>
 
