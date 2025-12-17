@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>A-Frame WebXR Blocks Demo</title>
+  <title>A-Frame WebXR Blocks Demo (Quest fix)</title>
 
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
 
-  <!-- Nice environment in 1 line -->
+  <!-- Pretty environment -->
   <script src="https://unpkg.com/aframe-environment-component@1.5.0/dist/aframe-environment-component.min.js"></script>
 
   <style>
@@ -20,7 +20,7 @@
       background: rgba(10, 14, 28, 0.55);
       border: 1px solid rgba(255,255,255,0.15);
       backdrop-filter: blur(10px);
-      color: rgba(255,255,255,0.9);
+      color: rgba(255,255,255,0.92);
       box-shadow: 0 12px 40px rgba(0,0,0,0.35);
     }
     #hud button {
@@ -44,13 +44,13 @@
 </head>
 
 <body>
-  <!-- Desktop HUD (в VR не обязателен, но удобно тестить на ПК) -->
+  <!-- Desktop HUD -->
   <div id="hud">
     <button id="spawnBtn">Spawn block 🎲</button>
     <button id="clearBtn">Clear</button>
     <div class="hint">
-      VR: левый стик — ходьба, правый триггер — перетаскивать лучом.<br/>
-      Desktop: <kbd>WASD</kbd> + мышь (ЛКМ смотреть).
+      Quest: левый стик — ходьба. Правый триггер — перетаскивать лучом.<br/>
+      Desktop: <kbd>WASD</kbd> + мышь (ЛКМ чтобы смотреть).
     </div>
   </div>
 
@@ -77,7 +77,7 @@
       shadow: true;">
     </a-entity>
 
-    <!-- Some extra “pretty” props -->
+    <!-- Extra pretty prop -->
     <a-entity position="0 0 -6">
       <a-torus-knot
         position="0 2.1 0"
@@ -90,7 +90,7 @@
               material="color:#2b3a5e; metalness:0.1; roughness:0.6; emissive:#10182a; emissiveIntensity:0.25"></a-ring>
     </a-entity>
 
-    <!-- Light polish -->
+    <!-- Lighting -->
     <a-entity light="type: ambient; intensity: 0.28; color: #aab6ff"></a-entity>
     <a-entity light="type: directional; intensity: 0.85; color: #e8f0ff" position="2 6 3"></a-entity>
 
@@ -103,26 +103,21 @@
         position="0 1.65 0">
       </a-entity>
 
-      <!-- Left hand: locomotion thumbstick -->
+      <!-- LEFT controller: locomotion (Quest) -->
       <a-entity id="leftHand"
-        hand-controls="hand: left"
-        raycaster="objects: .interactable, .ui; far: 12"
-        laser-controls="hand: left"
-        line="opacity: 0.35"
-        thumbstick-move="target: #rig; speed: 2.0">
+        oculus-touch-controls="hand: left"
+        thumbstick-locomotion="target: #rig; speed: 2.2">
       </a-entity>
 
-      <!-- Right hand: laser grab -->
+      <!-- RIGHT controller: laser ray + grab -->
       <a-entity id="rightHand"
-        hand-controls="hand: right"
-        raycaster="objects: .interactable, .ui; far: 12"
         laser-controls="hand: right"
-        line="opacity: 0.8"
+        raycaster="objects: .interactable, .ui; far: 12; showLine: true; lineOpacity: 0.9"
         raygrab="spawnSelector: #spawnButton">
       </a-entity>
     </a-entity>
 
-    <!-- VR panel with a “Spawn” button -->
+    <!-- VR panel with Spawn button -->
     <a-entity id="vrPanel" position="0 1.25 1.25" rotation="0 180 0">
       <a-plane width="0.85" height="0.32" radius="0.06"
         material="color: #0f1730; opacity: 0.85; metalness: 0.0; roughness: 0.9"
@@ -138,6 +133,7 @@
       </a-entity>
 
       <a-text value="SPAWN"
+        class="ui"
         align="center"
         position="0 0 0.03"
         width="2.2"
@@ -145,6 +141,7 @@
       </a-text>
 
       <a-text value="Aim + Trigger"
+        class="ui"
         align="center"
         position="0 -0.13 0.03"
         width="1.8"
@@ -156,24 +153,24 @@
     <!-- Blocks container -->
     <a-entity id="blocks"></a-entity>
 
-    <!-- Helper component: rounded corners for button plane -->
     <script>
-      // Tiny rounded plane helper (no external libs)
+      // ----------------------------
+      // Rounded plane helper
+      // ----------------------------
       AFRAME.registerComponent('rounded', {
         schema: { radius: { default: 0.08 } },
         init() {
           const el = this.el;
-          const geom = el.getObject3D('mesh')?.geometry;
-          // If geometry isn't ready yet, retry next frame.
-          if (!geom) return requestAnimationFrame(() => this.init());
+          const mesh = el.getObject3D('mesh');
+          if (!mesh || !mesh.geometry) return requestAnimationFrame(() => this.init());
 
-          // Replace plane geometry with a rounded shape mesh.
           const w = el.getAttribute('geometry').width || 1;
           const h = el.getAttribute('geometry').height || 1;
           const r = Math.min(this.data.radius, Math.min(w, h) * 0.5);
 
           const shape = new THREE.Shape();
           const hw = w / 2, hh = h / 2;
+
           shape.moveTo(-hw + r, -hh);
           shape.lineTo(hw - r, -hh);
           shape.quadraticCurveTo(hw, -hh, hw, -hh + r);
@@ -185,47 +182,52 @@
           shape.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
 
           const newGeom = new THREE.ShapeGeometry(shape, 24);
-          const mesh = el.getObject3D('mesh');
           mesh.geometry.dispose();
           mesh.geometry = newGeom;
         }
       });
 
-      // Billboard (label always faces camera)
+      // ----------------------------
+      // Billboard labels
+      // ----------------------------
       AFRAME.registerComponent('billboard', {
         schema: { target: { type: 'selector', default: '#camera' } },
         tick() {
           const t = this.data.target;
           if (!t) return;
-          const obj = this.el.object3D;
-          obj.lookAt(t.object3D.getWorldPosition(new THREE.Vector3()));
+          this.el.object3D.lookAt(
+            t.object3D.getWorldPosition(new THREE.Vector3())
+          );
         }
       });
 
-      // Thumbstick locomotion for Quest (left controller)
-      AFRAME.registerComponent('thumbstick-move', {
+      // ----------------------------
+      // Thumbstick locomotion (reliable on Quest)
+      // ----------------------------
+      AFRAME.registerComponent('thumbstick-locomotion', {
         schema: {
           target: { type: 'selector' },
           speed: { default: 2.0 },
           deadzone: { default: 0.12 }
         },
+        init() {
+          this.axis = { x: 0, y: 0 };
+          this.el.addEventListener('thumbstickmoved', (evt) => {
+            this.axis.x = evt.detail.x || 0;
+            this.axis.y = evt.detail.y || 0;
+          });
+        },
         tick(t, dt) {
           const target = this.data.target;
           if (!target) return;
 
-          const tc = this.el.components['tracked-controls'];
-          const gp = tc && tc.controller;
-          if (!gp || !gp.axes || gp.axes.length < 2) return;
+          let ax = this.axis.x;
+          let ay = this.axis.y;
 
-          // Usually axes[0], axes[1] = primary thumbstick on that controller
-          let ax = gp.axes[0] || 0;
-          let ay = gp.axes[1] || 0;
-
-          // Deadzone
           const dz = this.data.deadzone;
           if (Math.abs(ax) < dz) ax = 0;
           if (Math.abs(ay) < dz) ay = 0;
-          if (ax === 0 && ay === 0) return;
+          if (!ax && !ay) return;
 
           const rig = target.object3D;
 
@@ -233,8 +235,8 @@
           const cam = document.querySelector('#camera');
           const yaw = cam ? cam.object3D.rotation.y : 0;
 
-          const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
-          const right   = new THREE.Vector3(1, 0,  0).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+          const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+          const right   = new THREE.Vector3(1, 0,  0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
 
           const move = new THREE.Vector3()
             .addScaledVector(right, ax)
@@ -245,7 +247,9 @@
         }
       });
 
-      // Laser grab: aim at block, hold trigger, drag along ray
+      // ----------------------------
+      // Ray grab: aim + trigger => drag along ray
+      // ----------------------------
       AFRAME.registerComponent('raygrab', {
         schema: {
           spawnSelector: { type: 'selector' },
@@ -258,13 +262,12 @@
           this.onDown = this.onDown.bind(this);
           this.onUp = this.onUp.bind(this);
 
-          // Trigger/grip for VR + mouse fallback
           this.el.addEventListener('triggerdown', this.onDown);
           this.el.addEventListener('gripdown', this.onDown);
           this.el.addEventListener('triggerup', this.onUp);
           this.el.addEventListener('gripup', this.onUp);
 
-          // Desktop fallback (if you attach this to camera later)
+          // Desktop fallback
           this.el.addEventListener('mousedown', this.onDown);
           this.el.addEventListener('mouseup', this.onUp);
         },
@@ -287,16 +290,18 @@
           const target = this.findTargetFromIntersection(hit);
           if (!target) return;
 
-          // If it's the UI spawn button (or inside it), spawn instead of grabbing
+          // UI Spawn button
           const spawnBtn = this.data.spawnSelector;
           if (spawnBtn && (target === spawnBtn || spawnBtn.contains(target))) {
             window.spawnRandomBlock?.();
-            // Small visual feedback
-            spawnBtn.setAttribute('animation__pulse', 'property: scale; to: 1.08 1.08 1; dur: 90; dir: alternate; loop: 2; easing: easeOutQuad');
+            spawnBtn.setAttribute(
+              'animation__pulse',
+              'property: scale; to: 1.08 1.08 1; dur: 90; dir: alternate; loop: 2; easing: easeOutQuad'
+            );
             return;
           }
 
-          // If target is a child, climb to root block if exists
+          // Climb to root block
           let root = target;
           while (root && root !== this.el.sceneEl) {
             if (root.dataset && root.dataset.blockRoot === '1') break;
@@ -304,7 +309,6 @@
           }
           if (!root || root === this.el.sceneEl) root = target;
 
-          // Save grabbed
           this.grabbed = root;
           this.grabDistance = Math.min(hit.distance || 2.0, this.data.maxDistance);
           root.setAttribute('animation__hover', 'property: scale; to: 1.03 1.03 1.03; dur: 120; easing: easeOutQuad');
@@ -328,7 +332,6 @@
 
           const worldPoint = origin.add(dir.multiplyScalar(this.grabDistance));
 
-          // Convert world point into grabbed parent local space
           const obj3d = this.grabbed.object3D;
           const parent = obj3d.parent;
           if (!parent) return;
@@ -338,7 +341,9 @@
         }
       });
 
+      // ----------------------------
       // Random blocks spawner
+      // ----------------------------
       const LABELS = [
         "Вектор мыслей", "Внутренний компас", "Микро-страх", "Режим бога",
         "Слой препятствий", "Фокус", "Идея", "Смысл", "План", "Поток",
@@ -349,18 +354,18 @@
       const choice = (arr) => arr[(Math.random() * arr.length) | 0];
 
       window.spawnRandomBlock = function () {
-        const scene = document.querySelector('a-scene');
         const container = document.querySelector('#blocks');
         const cam = document.querySelector('#camera');
 
         const label = `${choice(LABELS)} #${((Math.random()*999)|0).toString().padStart(3,'0')}`;
 
-        // Spawn point: in front of camera, slightly random
+        // Spawn in front of camera
         const camPos = cam.object3D.getWorldPosition(new THREE.Vector3());
-        const camDir = new THREE.Vector3(0,0,-1).applyQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()));
+        const camQuat = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
+
+        const camDir = new THREE.Vector3(0,0,-1).applyQuaternion(camQuat);
         const forward = camDir.clone().multiplyScalar(rand(1.6, 2.3));
-        const side = new THREE.Vector3(1,0,0).applyQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()))
-                    .multiplyScalar(rand(-0.8, 0.8));
+        const side = new THREE.Vector3(1,0,0).applyQuaternion(camQuat).multiplyScalar(rand(-0.8, 0.8));
 
         const p = camPos.clone().add(forward).add(side);
         p.y = rand(0.9, 1.5);
@@ -374,11 +379,12 @@
 
         const root = document.createElement('a-entity');
         root.dataset.blockRoot = "1";
-        root.classList.add('interactable');
         root.setAttribute('position', `${p.x.toFixed(3)} ${p.y.toFixed(3)} ${p.z.toFixed(3)}`);
 
-        // Box
+        // IMPORTANT FIX:
+        // Put .interactable on the mesh/geometry element (a-box), not only on a parent a-entity.
         const box = document.createElement('a-box');
+        box.classList.add('interactable');
         box.setAttribute('width', w.toFixed(3));
         box.setAttribute('height', h.toFixed(3));
         box.setAttribute('depth', d.toFixed(3));
@@ -386,7 +392,7 @@
         box.setAttribute('shadow', 'cast: true; receive: true');
         root.appendChild(box);
 
-        // Label board (billboard)
+        // Label
         const labelWrap = document.createElement('a-entity');
         labelWrap.setAttribute('position', `0 ${(h/2 + 0.18).toFixed(3)} 0`);
         labelWrap.setAttribute('billboard', 'target: #camera');
@@ -408,14 +414,14 @@
 
         root.appendChild(labelWrap);
 
-        // Slight appear animation
+        // Pop animation
         root.setAttribute('scale', '0.001 0.001 0.001');
         root.setAttribute('animation__pop', 'property: scale; to: 1 1 1; dur: 140; easing: easeOutBack');
 
         container.appendChild(root);
       };
 
-      // Wire up HUD buttons
+      // HUD buttons
       window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('spawnBtn').addEventListener('click', () => window.spawnRandomBlock());
         document.getElementById('clearBtn').addEventListener('click', () => {
@@ -423,7 +429,7 @@
           while (c.firstChild) c.removeChild(c.firstChild);
         });
 
-        // Spawn a couple on start
+        // Spawn a couple at start
         setTimeout(() => window.spawnRandomBlock(), 300);
         setTimeout(() => window.spawnRandomBlock(), 650);
       });
