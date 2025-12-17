@@ -1,554 +1,182 @@
 <!doctype html>
-<html lang="en">
-
+<html lang="ru">
 <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
-        integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+  <title>Noda VR Smoke Test</title>
 
-    <script src="https://noda.io/api/includes/noda.js"></script>
+  <!-- Официальный include -->
+  <script src="https://noda.io/api/includes/noda.js"></script>
 
-    <title>Noda Plugin Starter</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 16px; }
+    .box { border: 1px solid #ddd; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+    .ok { background:#e9fbe9; }
+    .bad { background:#ffe9e9; }
+    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #999; background:#f7f7f7; cursor:pointer; margin-right: 8px; }
+    textarea { width: 100%; min-height: 180px; font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
+    .mono { font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; }
+  </style>
 
-    <script>
+  <script>
+    let statusEl, logEl;
+    let ready = false;
 
-        var statusElement;
-        var statusMessageElement;
+    function setStatus(ok, msg) {
+      statusEl.className = "box " + (ok ? "ok" : "bad");
+      statusEl.innerHTML = msg;
+    }
 
-        document.addEventListener('DOMContentLoaded', function () {
-            statusElement = document.getElementById('status');
-            statusMessageElement = document.getElementById('statusMessage');
-            eventsMessageElement = document.getElementById('eventsMessage');
+    function addLog(msg) {
+      logEl.value = (msg + "\n" + logEl.value).slice(0, 20000);
+    }
 
-            window.noda.onNodeCreated = function (node) { eventMessage("Node created with uuid: " + node.uuid); }
-            window.noda.onNodeUpdated = function (node) {
-                 eventMessage("Node updated with uuid: " + node.uuid);
-                 if(node.selected) {
-                     showNodeProps(node);
-                 }
-            }
-            window.noda.onNodeDeleted = function (node) { eventMessage("Node deleted with uuid: " + node.uuid); }
+    function mustReady() {
+      if (!ready) throw new Error("Not ready: Noda WebAPI not initialized yet.");
+      if (!window.noda) throw new Error("window.noda is missing.");
+      if (!window.noda.isInstalled()) throw new Error("Noda VR context not found (not opened inside Noda Browser).");
+    }
 
-            window.noda.onLinkCreated = function (link) { eventMessage("Link created with uuid: " + link.uuid); }
-            window.noda.onLinkUpdated = function (link) {
-                 eventMessage("Link updated with uuid: " + link.uuid);
-                 if(link.selected) {
-                     showLinkProps(link);
-                 }
-            }
-            window.noda.onLinkDeleted = function (link) { eventMessage("Link deleted with uuid: " + link.uuid); } 
+    document.addEventListener("DOMContentLoaded", () => {
+      statusEl = document.getElementById("status");
+      logEl = document.getElementById("log");
 
-            window.noda.onInitialized = function () {
-                if (!window.noda.isInstalled())
-                    statusError("Noda VR context not found, please try from within VR app.");
-                else
-                    populateUser();
-            }
+      // События — чтобы видеть, что хоть что-то приходит
+      window.noda.onNodeCreated = (n) => addLog("onNodeCreated uuid=" + n.uuid);
+      window.noda.onLinkCreated = (l) => addLog("onLinkCreated uuid=" + l.uuid);
 
-        }, false);
+      window.noda.onInitialized = async () => {
+        try {
+          const installed = window.noda.isInstalled();
+          addLog("onInitialized. isInstalled=" + installed);
 
-        async function populateUser()
-        {
-            try {
-                console.log("Calling getUser");
-                const user = await window.noda.getUser();
-                console.log("Returned from getUser with value: " + user.userId);
-                document.getElementById('userId').textContent = user.userId;
-            } catch (error) {
-                statusError("Get User error: " + error);
-            }
+          if (!installed) {
+            setStatus(false, "❌ Не вижу VR-контекст. Открой эту страницу через <b>Noda → Application Menu → Browser</b> (не через обычный Quest Browser).");
+            return;
+          }
 
+          const user = await window.noda.getUser();
+          ready = true;
+          setStatus(true, "✅ WebAPI готов. userId: <span class='mono'>" + user.userId + "</span><br/>Теперь жми кнопки ниже — ноды должны появляться ПРЯМО ПЕРЕД ОКНОМ (relativeTo=Window).");
+        } catch (e) {
+          setStatus(false, "❌ Ошибка инициализации: <span class='mono'>" + String(e) + "</span>");
+          addLog("init error: " + String(e));
+        }
+      };
+    });
+
+    async function clearMap() {
+      try {
+        mustReady();
+        addLog("clearMap()");
+        await window.noda.clearMap();
+        addLog("clearMap OK");
+      } catch (e) {
+        addLog("clearMap ERROR: " + String(e));
+        setStatus(false, "❌ clearMap: <span class='mono'>" + String(e) + "</span>");
+      }
+    }
+
+    async function createOneHugeNode() {
+      try {
+        mustReady();
+        addLog("createOneHugeNode()");
+
+        const node = await window.noda.createNode({
+          uuid: "smoke:one",
+          title: "SMOKE TEST: Я ДОЛЖЕН БЫТЬ ВИДЕН",
+          color: "F44336",
+          opacity: 1,
+          shape: "Box",
+          size: 20,
+          notes: "Если ты видишь эту ноду в VR — API работает.",
+          location: {
+            x: 0, y: 0.0, z: -0.8,
+            relativeTo: "Window"   // ключевая вещь: прямо перед браузерным окном
+          }
+        });
+
+        addLog("created node uuid=" + node.uuid);
+        setStatus(true, "✅ Создал ноду <span class='mono'>" + node.uuid + "</span>. Она должна быть прямо перед окном браузера.");
+      } catch (e) {
+        addLog("createOneHugeNode ERROR: " + String(e));
+        setStatus(false, "❌ createNode: <span class='mono'>" + String(e) + "</span>");
+      }
+    }
+
+    async function createManyNodes() {
+      try {
+        mustReady();
+        addLog("createManyNodes()");
+
+        // создадим 120 нод “облаком” перед окном
+        const N = 120;
+        for (let i = 0; i < N; i++) {
+          const row = i % 12;
+          const col = Math.floor(i / 12);
+
+          const x = (row - 5.5) * 0.12;     // ширина
+          const y = (col * 0.10);           // высота
+          const z = -1.2 - (i % 6) * 0.06;  // глубина
+
+          const nodeProps = {
+            uuid: "smoke:n" + i,
+            title: "log #" + i,
+            color: (i % 2 === 0) ? "2196F3" : "4CAF50",
+            opacity: 1,
+            shape: (i % 4 === 0) ? "Star" : (i % 4 === 1) ? "Diamond" : (i % 4 === 2) ? "Hourglass" : "Box",
+            size: 6,
+            notes: "bulk node " + i,
+            location: { x, y, z, relativeTo: "Window" }
+          };
+
+          await window.noda.createNode(nodeProps);
         }
 
-        function statusSuccess(message) {
-            statusMessageElement.textContent = message;
-            statusElement.classList.remove('error');
-            statusElement.classList.add('success');
-        }
-
-        function statusError(message) {
-            statusMessageElement.textContent = message;
-            statusElement.classList.add('error');
-            statusElement.classList.remove('success');
-        }
-
-        function eventMessage(message) {
-            eventsMessageElement.innerHTML = message + "<br/>" + eventsMessageElement.innerHTML;
-        }
-
-        function clearEvents() {
-            eventsMessageElement.innerHTML = "";
-        }    
-
-        async function createNode() {
-            try {
-                var nodeProps = obtainNodeProps();
-
-                const node = await window.noda.createNode(nodeProps);
-
-                //You can supply a Uuid or one will be assigned at creation time
-                document.getElementById('nodeUuid').value = node.uuid;
-
-                statusSuccess("Node created with uuid: " + node.uuid);
-
-            } catch(error) {
-                statusError("Node create error: " + error);
-            }
-        }
-
-        async function updateNode() {
-            try {
-                var nodeProps = obtainNodeProps();
-
-                const node = await window.noda.updateNode(nodeProps);
-
-                statusSuccess("Node updated with uuid: " + node.uuid);
-
-            } catch (error) {
-                statusError("Node update error: " + error);
-            }
-        }
-
-        async function deleteNode() {
-            try {
-                var nodeProps = {};
-
-                nodeProps.uuid = document.getElementById('nodeUuid').value;
-
-                const node = await window.noda.deleteNode(nodeProps);
-
-                statusSuccess("Node deleted with uuid: " + node.uuid);
-
-            } catch (error) {
-                statusError("Node delete error: " + error);
-            }
-        }
-
-        async function listNodes() {
-            try {
-                var nodeProps = obtainNodeProps();
-
-                const result = await window.noda.listNodes(nodeProps);
-
-                let count = 0;
-
-                if(result != null && result.nodes != null)
-                    count = result.nodes.length;
-
-                statusSuccess("List Nodes returned " + count + " nodes");
-
-            } catch (error) {
-                statusError("List Nodes error: " + error);
-            }
-        }
-
-        function obtainNodeProps()
-        {
-            var nodeProps = {};
-
-            nodeProps.uuid = document.getElementById('nodeUuid').value;
-            nodeProps.title = document.getElementById('nodeTitle').value;
-            nodeProps.color = document.getElementById('nodeColor').value;
-            nodeProps.opacity = parseFloat(document.getElementById('nodeOpacity').value);
-            nodeProps.shape = document.getElementById('nodeShape').value;
-            nodeProps.imageUrl = document.getElementById('nodeImageUrl').value;
-            nodeProps.notes = document.getElementById('nodeNotes').value;
-            nodeProps.pageUrl = document.getElementById('nodePageUrl').value;
-            nodeProps.size = parseFloat(document.getElementById('nodeSize').value);
-
-            nodeProps.location = {};
-
-            nodeProps.location.x = parseFloat(document.getElementById('nodeX').value);
-            nodeProps.location.y = parseFloat(document.getElementById('nodeY').value);
-            nodeProps.location.z = parseFloat(document.getElementById('nodeZ').value);
-            nodeProps.location.x = nodeProps.location.x != NaN ? nodeProps.location.x : 0;
-            nodeProps.location.y = nodeProps.location.y != NaN ? nodeProps.location.y : 0;
-            nodeProps.location.z = nodeProps.location.z != NaN ? nodeProps.location.z : 0;
-
-            nodeProps.location.relativeTo = document.getElementById('nodeRelativeTo').value;
-
-            nodeProps.selected = document.getElementById('nodeSelected').checked;
-            nodeProps.collapsed = document.getElementById('nodeCollapsed').checked;
-
-            return nodeProps;
-        }
-
-        function showNodeProps(nodeProps) {
-
-            document.getElementById('nodeUuid').value = nodeProps.uuid;
-            document.getElementById('nodeTitle').value = nodeProps.title;
-            document.getElementById('nodeColor').value = nodeProps.color;
-            document.getElementById('nodeOpacity').value = nodeProps.opacity;
-            document.getElementById('nodeShape').value = nodeProps.shape;
-            document.getElementById('nodeImageUrl').value = nodeProps.imageUrl;
-            document.getElementById('nodeNotes').value = nodeProps.notes;
-            document.getElementById('nodePageUrl').value = nodeProps.pageUrl;
-            document.getElementById('nodeSize').value = nodeProps.size;
-
-            document.getElementById('nodeX').value = nodeProps.location.x;
-            document.getElementById('nodeY').value = nodeProps.location.y;
-            document.getElementById('nodeZ').value = nodeProps.location.z;
-
-            document.getElementById('nodeRelativeTo').value = nodeProps.location.relativeTo;
-
-            document.getElementById('nodeSelected').checked = nodeProps.selected;
-            document.getElementById('nodeCollapsed').checked = nodeProps.collapsed;
-
-            return nodeProps;
-        }
-
-        async function createLink()
-        {
-            try {
-                var linkProps = obtainLinkProps();
-
-                const link = await window.noda.createLink(linkProps);
-
-                //You can supply a Uuid or one will be assigned at creation time
-                document.getElementById('linkUuid').value = link.uuid;
-
-                statusSuccess("Link created with uuid: " + link.uuid);
-
-            } catch (error) {
-                statusError("Link create error: " + error);
-            }
-        }
-
-        async function updateLink() {
-            try {
-                var linkProps = obtainLinkProps();
-
-                const link = await window.noda.updateLink(linkProps);
-
-                statusSuccess("Link updated with uuid: " + link.uuid);
-
-            } catch (error) {
-                statusError("Link update error: " + error);
-            }
-        }
-
-        async function deleteLink() {
-            try {
-                var linkProps = {};
-
-                linkProps.uuid = document.getElementById('linkUuid').value;
-
-                const link = await window.noda.deleteLink(linkProps);
-
-                statusSuccess("Link deleted with uuid: " + link.uuid);
-
-            } catch (error) {
-                statusError("Link delete error: " + error);
-            }
-        }
-
-        async function listLinks() {
-            try {
-                var linkProps = obtainLinkProps();
-
-                const result = await window.noda.listLinks(linkProps);
-
-                let count = 0;
-
-                if (result != null && result.links != null)
-                    count = result.links.length;
-
-                statusSuccess("List Links returned " + count + " links");
-
-            } catch (error) {
-                statusError("List Links error: " + error);
-            }
-        }
-
-        var savedMapJsonText = null;
-        
-        async function saveMap() {
-            try {
-                const result = await window.noda.saveJson();
-
-                savedMapJsonText = result.jsonString;
-                
-                statusSuccess("Map saved");
-
-            } catch (error) {
-                statusError("Save Map error: " + error);
-            }
-        }
-        
-        async function loadMap() {
-            try {
-                const result = await window.noda.loadJson({jsonString:savedMapJsonText});
-
-                statusSuccess("Map loaded");
-
-            } catch (error) {
-                statusError("Load Map error: " + error);
-            }
-        }
-        
-        async function clearMap() {
-            try {
-                const result = await window.noda.clearMap();
-
-                statusSuccess("Map cleared");
-
-            } catch (error) {
-                statusError("Clear Map error: " + error);
-            }
-        }
-
-        function obtainLinkProps() {
-            var linkProps = {};
-
-            linkProps.uuid = document.getElementById('linkUuid').value;
-            linkProps.fromUuid = document.getElementById('linkFromUuid').value;
-            linkProps.toUuid = document.getElementById('linkToUuid').value;
-
-            linkProps.title = document.getElementById('linkTitle').value;
-            linkProps.color = document.getElementById('linkColor').value;
-            linkProps.shape = document.getElementById('linkShape').value;
-            linkProps.size = parseFloat(document.getElementById('linkSize').value);
-            linkProps.curve = document.getElementById('linkCurve').value;
-            linkProps.trail = document.getElementById('linkTrail').value;
-
-            linkProps.selected = document.getElementById('linkSelected').checked;
-
-            return linkProps;
-        }
-
-        function showLinkProps(linkProps) {
-
-            document.getElementById('linkUuid').value = linkProps.uuid;
-            document.getElementById('linkFromUuid').value = linkProps.fromUuid;
-            document.getElementById('linkToUuid').value = linkProps.toUuid;
-            document.getElementById('linkTitle').value = linkProps.title;
-            document.getElementById('linkColor').value = linkProps.color;
-            document.getElementById('linkShape').value = linkProps.shape;
-            document.getElementById('linkSize').value = linkProps.size;
-            document.getElementById('linkCurve').value = linkProps.curve;
-            document.getElementById('linkTrail').value = linkProps.trail;
-            
-            document.getElementById('linkSelected').selected = linkProps.checked;
-
-            return linkProps;
-        }
-
-    </script>
-
-    <style>
-        h1 {font-size:medium}
-        body {padding:20px}
-        .node-form  label {display: inline-block; width: 28%}
-        .link-form  label {display: inline-block; width: 32%}
-        .status.error {background-color: rgb(241, 169, 169);}
-        .status.success {background-color: rgb(189, 235, 189);}
-        .status {margin: 15px 0; padding: 10px; background-color: bisque; height: 75px; overflow-y:auto;}
-        .status p {margin-bottom: 0;}
-        .status span {font-size: 80%; font-weight: bold;}
-        .events {margin: 15px 0; padding: 10px; background-color: blanchedalmond; height: 127px; overflow-y:auto;}
-        .events #eventsMessage {font-family: monospace; font-size: 85%;}
-        .crud-form { padding: 15px; background-color:aliceblue}
-        .crud-form input[type='button'] {margin-right: 10}
-        .map-form {margin-top: 15px}
-        
-        div.crud-form p {margin-bottom: .9rem}
-
-        #nodeColor {width: 5em;}
-        #nodeShape {width: 7em;}
-        #nodeRelativeTo {width:6em;}        
-        #linkColor {width:6em;}        
-        #linkShape {width:6em;}
-
-        #nodeSelected {margin-right:100px}
-    </style>
+        // линк между первой и последней — просто чтобы проверить link
+        await window.noda.createLink({
+          uuid: "smoke:link",
+          fromUuid: "smoke:n0",
+          toUuid: "smoke:n119",
+          title: "range",
+          color: "171717",
+          shape: "Dash",
+          size: 2,
+          curve: "None",
+          trail: "Ring",
+          selected: false
+        });
+
+        setStatus(true, "✅ Создал " + N + " нод + 1 линк. Ты должен увидеть “стенку” из элементов перед окном.");
+        addLog("createManyNodes OK");
+      } catch (e) {
+        addLog("createManyNodes ERROR: " + String(e));
+        setStatus(false, "❌ bulk create: <span class='mono'>" + String(e) + "</span>");
+      }
+    }
+  </script>
 </head>
 
 <body>
-    <h1>Noda Web API Test (User: <span id="userId"></span>)</h1>
+  <h2>Noda VR Smoke Test</h2>
 
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-6">
+  <div id="status" class="box bad">
+    ⏳ Жду инициализацию Noda WebAPI…
+  </div>
 
-                <div class="crud-form node-form">
-                    <h2>Node</h2>
-
-                    <p>
-                        <label for="nodeUuid">Uuid:</label> <input id="nodeUuid" type="text" size="30"/>
-                    </p>
-
-                    <p>
-                        <label for="nodeTitle">Title:</label> <input id="nodeTitle" type="text" size="30"/>
-                    </p>
-
-                    <p>
-                        <label for="nodeColor">Color:</label>
-                        <select id="nodeColor">
-                            <option name="Green" value="4CAF50">Green</option>
-                            <option name="Blue" value="2196F3">Blue</option>
-                            <option name="Red" value="F44336">Red</option>
-                        </select>
-                    </p>
-
-                    <p>
-                        <label for="nodeOpacity">Opacity:</label> 
-                        <input id="nodeOpacity" type="range" min="0" max="1" step=".1" value="1" />
-                    </p>
-
-                    <p>
-                        <label for="nodeShape">Shape:</label>
-                        <select id="nodeShape">
-                            <option value="Ball">Ball</option>
-                            <option value="Box">Box</option>
-                            <option value="Tetra">Tetra</option>
-                            <option value="Cylinder">Cylinder</option>
-                            <option value="Diamond">Diamond</option>
-                            <option value="Hourglass">Hourglass</option>
-                            <option value="Plus">Plus</option>
-                            <option value="Star">Star</option>
-                        </select>
-                    </p>
-
-                    <p>
-                        <label for="nodeImageUrl">ImageUrl:</label> <input id="nodeImageUrl" type="text" size="30"/>
-                    </p>
-
-                    <p>
-                        <label for="nodeNotes">Notes:</label> <textarea id="nodeNotes" cols="28"></textarea>
-                    </p>
-
-                    <p>
-                        <label for="nodePageUrl">PageUrl:</label> <input id="nodePageUrl" type="text" size="30"/>
-                    </p>
-
-                    <p>
-                        <label for="nodeSize">Size:</label> <input id="nodeSize" type="range" min="1" max="9" value="5" />
-                    </p>
-
-                    <p>
-                        <label>Location:</label>
-                            x: <input id="nodeX" type="text" value=".15" size="4" /> y: <input id="nodeY" type="text" value=".025" size="4" /> z: <input id="nodeZ" type="text" value="-0.15" size="4" />
-                    </p>
-
-                    <p>
-                        <label for="nodeRelativeTo">Relative To:</label>
-                        <select id="nodeRelativeTo">
-                            <option value="Origin">Origin</option>
-                            <option value="User">User</option>
-                            <option value="Window" selected>Window</option>
-                        </select>
-                    </p>
-
-                    <p>
-                        <label for="nodeSelected">Selected:</label> <input id="nodeSelected" type="checkbox" />
-                        <label for="nodeCollapsed">Collapsed:</label> <input id="nodeCollapsed" type="checkbox" />
-                    </p>
-
-                    <p>
-                        <input type="button" value="Create Node" onclick="createNode()" />
-                        <input type="button" value="Update Node" onclick="updateNode()" />
-                        <input type="button" value="Delete Node" onclick="deleteNode()" />
-                        <input type="button" value="List Nodes" onclick="listNodes()" />
-                    </p>
-
-                </div>
-
-                <div class="crud-form map-form">
-                    <h2>Map</h2>
-                    
-                    <p>
-                        <input type="button" value="Save Map" onclick="saveMap()" />
-                        <input type="button" value="Load Map" onclick="loadMap()" />
-                        <input type="button" value="Clear Map" onclick="clearMap()" />
-                    </p>
-
-                </div>
-            </div>
-
-            <div class="col-6" >
-                <div class="crud-form link-form">
-                    <h2>Link</h2>
-                    
-                    <p>
-                        <label for="linkUuid">Uuid:</label> <input id="linkUuid" type="text" size="30" />
-                    </p>
-
-                    <p>
-                        <label for="linkFromUuid">From Node Uuid:</label> <input id="linkFromUuid" type="text" size="30"/>
-                    </p>
-
-                    <p>
-                        <label for="linkToUuid">To Node Uuid:</label> <input id="linkToUuid" type="text" size="30"/>
-                    </p>
-
-                    <p>
-                        <label for="linkTitle">Title:</label> <input id="linkTitle" type="text" size="30"/>
-                    </p>
-                    
-                    <p>
-                        <label for="linkColor">Color:</label>
-                        <select id="linkColor">
-                            <option name="Black" value="171717">Black</option>
-                            <option name="White" value="D7D7D7">White</option>
-                        </select>
-                    </p>
-                        
-                    <p>
-                        <label for="linkShape">Pattern:</label>
-                        <select id="linkShape">
-                            <option value="Solid">Solid</option>
-                            <option value="Dash">Dash</option>
-                            <option value="Arrows">Arrows</option>
-                        </select>
-                    </p>
-                    
-                    <p>
-                        <label for="linkSize">Thickness:</label> <input id="linkSize" type="range" min="1" max="9" value="1" />
-                    </p>
-
-                    <p>
-                        <label for="linkCurve">Curve:</label>
-                        <select id="linkCurve">
-                            <option value="None">None</option>
-                            <option value="CDown">C Down</option>
-                            <option value="CUp">C Up</option>
-                            <option value="SDown">S Down</option>
-                            <option value="SUp">S Up</option>
-                        </select>
-                    </p>
-
-                    <p>
-                        <label for="linkTrail">Trail:</label>
-                        <select id="linkTrail">
-                            <option value="None">None</option>
-                            <option value="Cone">Cone</option>
-                            <option value="Ball">Ball</option>
-                            <option value="Ring">Ring</option>
-                        </select>
-                    </p>
-
-                    <p>
-                        <label for="linkSelected">Selected:</label> <input id="linkSelected" type="checkbox" />
-                    </p>
-                    
-                    <p>
-                        <input type="button" value="Create Link" onclick="createLink()" />
-                        <input type="button" value="Update Link" onclick="updateLink()" />
-                        <input type="button" value="Delete Link" onclick="deleteLink()" />
-                        <input type="button" value="List Links" onclick="listLinks()" />
-                    </p>
-                </div>
-
-                <div id="status" class="status success"><p>Status: <span id="statusMessage"></span></p></div>
-
-                <div id="events" class="events"><p>Events: <span style="float:right;margin-right:10px"><a href="#" onclick="clearEvents()">Clear</a></span><br/><span id="eventsMessage"></span></p></div>
-            </div>
-        </div>
+  <div class="box">
+    <button onclick="clearMap()">1) Clear map</button>
+    <button onclick="createOneHugeNode()">2) Create ONE huge node</button>
+    <button onclick="createManyNodes()">3) Create MANY nodes</button>
+    <div style="margin-top:10px; font-size: 13px;">
+      Если после <b>Create ONE huge node</b> ничего не появилось — почти наверняка страница открыта не внутри Noda Browser, либо окно “смотрит” не туда.
     </div>
-</body>
+  </div>
 
+  <div class="box">
+    <div style="margin-bottom:6px;">Логи (видно прямо на странице):</div>
+    <textarea id="log" readonly></textarea>
+  </div>
+</body>
 </html>
