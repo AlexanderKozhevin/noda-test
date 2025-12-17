@@ -1,438 +1,800 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>A-Frame WebXR Blocks Demo (Quest fix)</title>
+  <title>colorize.cc OS — WebXR Mind Map</title>
 
   <!-- A-Frame -->
-  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
-  <!-- Pretty environment -->
-  <script src="https://unpkg.com/aframe-environment-component@1.5.0/dist/aframe-environment-component.min.js"></script>
+  <!-- Super Hands (grab / drag with controllers) -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe-super-hands-component@6.2.3/dist/aframe-super-hands-component.min.js"></script>
 
   <style>
-    html, body { margin:0; height:100%; background:#0b1020; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    html, body { height: 100%; margin: 0; background:#050510; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    /* Small desktop-only helper UI */
     #hud {
-      position: fixed; left: 14px; top: 14px; z-index: 10;
-      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-      padding: 10px 12px; border-radius: 14px;
-      background: rgba(10, 14, 28, 0.55);
-      border: 1px solid rgba(255,255,255,0.15);
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      z-index: 10;
+      width: min(520px, calc(100vw - 28px));
+      color: #d7f7ff;
+      background: rgba(5, 10, 20, .55);
+      border: 1px solid rgba(120, 220, 255, .22);
+      border-radius: 14px;
+      padding: 12px 12px 10px;
       backdrop-filter: blur(10px);
-      color: rgba(255,255,255,0.92);
-      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+      box-shadow: 0 10px 40px rgba(0,0,0,.35);
+      user-select: none;
     }
-    #hud button {
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(255,255,255,0.10);
-      color: rgba(255,255,255,0.95);
-      padding: 10px 12px; border-radius: 12px;
+    #hud .row { display:flex; gap:10px; align-items:center; justify-content:space-between; }
+    #hud h3 { margin: 0 0 8px; font-size: 14px; letter-spacing:.4px; color:#8ff0ff; }
+    #hud small { opacity:.85; display:block; margin-top:6px; line-height:1.25; }
+    #jsonBox {
+      display:none;
+      margin-top:10px;
+      width:100%;
+      height:180px;
+      border-radius: 12px;
+      border: 1px solid rgba(120, 220, 255, .22);
+      background: rgba(0,0,0,.35);
+      color:#e9fbff;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      outline:none;
+      resize: vertical;
+    }
+    button {
+      border-radius: 12px;
+      border: 1px solid rgba(120, 220, 255, .25);
+      background: rgba(0, 200, 255, .10);
+      color:#c9fbff;
+      padding: 10px 12px;
       cursor: pointer;
     }
-    #hud button:hover { background: rgba(255,255,255,0.16); }
-    #hud .hint { font-size: 13px; opacity: 0.85; line-height: 1.2; }
-    #hud kbd {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    button:hover { background: rgba(0, 200, 255, .16); }
+    button:active { transform: translateY(1px); }
+    .pill {
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(120, 220, 255, .22);
+      background: rgba(0,0,0,.22);
       font-size: 12px;
-      padding: 2px 7px; border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(0,0,0,0.25);
-      margin: 0 2px;
+      opacity: .95;
     }
+    @media (max-width: 600px) { #hud { font-size: 12px; } }
   </style>
 </head>
 
 <body>
-  <!-- Desktop HUD -->
+  <!-- Desktop helper panel (Quest VR users can ignore this) -->
   <div id="hud">
-    <button id="spawnBtn">Spawn block 🎲</button>
-    <button id="clearBtn">Clear</button>
-    <div class="hint">
-      Quest: левый стик — ходьба. Правый триггер — перетаскивать лучом.<br/>
-      Desktop: <kbd>WASD</kbd> + мышь (ЛКМ чтобы смотреть).
+    <h3>colorize.cc OS — Mind Map</h3>
+    <div class="row">
+      <div class="pill">Quest: Left stick = move • Right stick = turn</div>
+      <div style="display:flex; gap:8px;">
+        <button id="toggleJson">JSON</button>
+        <button id="applyJson">Apply</button>
+      </div>
     </div>
+    <small>
+      Controllers: <b>Trigger</b> selects node • <b>Grip</b> grabs/drags • <b>A</b> adds node (linked) • <b>Y</b> “link-from” mode • <b>B</b> deletes selected.
+      <br/>Desktop: WASD + mouse look.
+    </small>
+    <textarea id="jsonBox" spellcheck="false"></textarea>
   </div>
 
+  <!-- JSON definition (edit this, or use the desktop JSON box) -->
+  <script type="application/json" id="mindmap-json">
+  {
+    "nodes": [
+      { "id": "core", "label": "Core", "pos": [0, 1.7, -2.5], "color": "#00F0FF", "size": 0.18 },
+      { "id": "ux",   "label": "UX",   "pos": [-1.0, 1.6, -3.3], "color": "#7CFF6B", "size": 0.16 },
+      { "id": "ml",   "label": "ML",   "pos": [1.1, 1.9, -3.4], "color": "#FF4FD8", "size": 0.16 },
+      { "id": "api",  "label": "API",  "pos": [0.0, 1.1, -3.8], "color": "#FFD24D", "size": 0.15 },
+      { "id": "ops",  "label": "Ops",  "pos": [2.1, 1.2, -2.6], "color": "#9B7CFF", "size": 0.15 }
+    ],
+    "links": [
+      { "from": "core", "to": "ux",  "color": "#00F0FF", "thickness": 0.010 },
+      { "from": "core", "to": "ml",  "color": "#00F0FF", "thickness": 0.010 },
+      { "from": "core", "to": "api", "color": "#00F0FF", "thickness": 0.010 },
+      { "from": "core", "to": "ops", "color": "#00F0FF", "thickness": 0.010 },
+      { "from": "api",  "to": "ops", "color": "#FFD24D", "thickness": 0.008 }
+    ]
+  }
+  </script>
+
   <a-scene
-    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true"
-    vr-mode-ui="enabled: true"
-    background="color: #0b1020"
-    fog="type: exponential; density: 0.02; color: #0b1020">
+    background="color: #050510"
+    renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true;"
+    fog="type: exponential; color: #050510; density: 0.030"
+    xr-mode-ui="enabled: true"
+    vr-mode-ui="enabled: true">
 
-    <!-- Environment -->
-    <a-entity environment="
-      preset: forest;
-      dressing: trees;
-      dressingAmount: 28;
-      ground: hills;
-      groundYScale: 7;
-      groundColor: #1a2a2a;
-      groundColor2: #0f1a1a;
-      grid: none;
-      skyType: gradient;
-      skyColor: #0b1020;
-      horizonColor: #1a2450;
-      lightPosition: 0.6 1 0.2;
-      shadow: true;">
-    </a-entity>
+    <!-- Assets (optional) -->
+    <a-assets>
+      <!-- A tiny “glow-ish” texture made in JS and applied via component -->
+    </a-assets>
 
-    <!-- Extra pretty prop -->
-    <a-entity position="0 0 -6">
-      <a-torus-knot
-        position="0 2.1 0"
-        radius="0.55" radius-tubular="0.14"
-        segments-radial="128" segments-tubular="16"
-        material="metalness: 0.2; roughness: 0.25; color: #7aa7ff; emissive: #223366; emissiveIntensity: 0.4"
-        animation="property: rotation; to: 0 360 0; dur: 15000; loop: true; easing: linear">
-      </a-torus-knot>
-      <a-ring position="0 0.06 0" rotation="-90 0 0" radius-inner="1.6" radius-outer="1.75"
-              material="color:#2b3a5e; metalness:0.1; roughness:0.6; emissive:#10182a; emissiveIntensity:0.25"></a-ring>
-    </a-entity>
+    <!-- Lights -->
+    <a-entity light="type: ambient; intensity: 0.30; color: #7fdcff"></a-entity>
+    <a-entity light="type: directional; intensity: 0.55; color: #ffffff" position="-1 3 1"></a-entity>
 
-    <!-- Lighting -->
-    <a-entity light="type: ambient; intensity: 0.28; color: #aab6ff"></a-entity>
-    <a-entity light="type: directional; intensity: 0.85; color: #e8f0ff" position="2 6 3"></a-entity>
+    <!-- Starfield / particles -->
+    <a-entity starfield="radius: 55; count: 1800"></a-entity>
 
-    <!-- Player rig -->
-    <a-entity id="rig" position="0 0 4">
-      <a-entity id="camera"
-        camera
-        look-controls="pointerLockEnabled: true"
-        wasd-controls="acceleration: 45"
-        position="0 1.65 0">
-      </a-entity>
-
-      <!-- LEFT controller: locomotion (Quest) -->
-      <a-entity id="leftHand"
-        oculus-touch-controls="hand: left"
-        thumbstick-locomotion="target: #rig; speed: 2.2">
-      </a-entity>
-
-      <!-- RIGHT controller: laser ray + grab -->
-      <a-entity id="rightHand"
-        laser-controls="hand: right"
-        raycaster="objects: .interactable, .ui; far: 12; showLine: true; lineOpacity: 0.9"
-        raygrab="spawnSelector: #spawnButton">
-      </a-entity>
-    </a-entity>
-
-    <!-- VR panel with Spawn button -->
-    <a-entity id="vrPanel" position="0 1.25 1.25" rotation="0 180 0">
-      <a-plane width="0.85" height="0.32" radius="0.06"
-        material="color: #0f1730; opacity: 0.85; metalness: 0.0; roughness: 0.9"
-        shadow="receive: true">
+    <!-- Futuristic room -->
+    <a-entity id="room" position="0 0 0">
+      <!-- Floor -->
+      <a-plane id="floor"
+        rotation="-90 0 0"
+        width="60" height="60"
+        material="shader: standard; color: #07070d; metalness: 0.2; roughness: 0.85"
+        procedural-grid="size: 60; lines: 60; majorEvery: 5; minorColor: rgba(0,240,255,0.08); majorColor: rgba(0,240,255,0.18)">
       </a-plane>
 
-      <a-entity id="spawnButton"
-        class="ui"
-        geometry="primitive: plane; width: 0.52; height: 0.18"
-        material="color: #203a8a; opacity: 0.95; metalness: 0.1; roughness: 0.35; emissive: #12235a; emissiveIntensity: 0.55"
-        position="0 0 0.01"
-        rounded="radius: 0.06">
+      <!-- Soft platform -->
+      <a-cylinder position="0 0.01 -3.2" radius="3.4" height="0.04"
+        material="shader: standard; color: #060612; metalness: 0.35; roughness: 0.55; emissive: #00202a; emissiveIntensity: 0.6">
+      </a-cylinder>
+
+      <!-- Walls / panels -->
+      <a-plane position="0 2.2 -10" width="18" height="6"
+        material="shader: standard; color: #060612; metalness: 0.35; roughness: 0.65; emissive: #03031a; emissiveIntensity: 0.55">
+      </a-plane>
+
+      <!-- Neon frame on wall -->
+      <a-entity neon-frame="w: 14; h: 4.2; color: #00F0FF" position="0 2.2 -9.95"></a-entity>
+
+      <!-- Neon title on wall -->
+      <a-entity position="0 2.9 -9.85">
+        <a-text value="colorize.cc OS"
+          align="center"
+          width="8"
+          color="#8ff0ff"
+          opacity="0.95">
+        </a-text>
+
+        <!-- Back glow plate -->
+        <a-plane position="0 -0.15 -0.02" width="6.5" height="1.2"
+          material="shader: standard; color: #00131a; emissive: #00F0FF; emissiveIntensity: 0.55; metalness: 0.0; roughness: 1.0; opacity: 0.35; transparent: true">
+        </a-plane>
+
+        <a-entity animation="property: rotation; to: 0 360 0; loop: true; dur: 24000; easing: linear"></a-entity>
       </a-entity>
 
-      <a-text value="SPAWN"
-        class="ui"
-        align="center"
-        position="0 0 0.03"
-        width="2.2"
-        color="#eaf0ff">
-      </a-text>
+      <!-- Side neon pylons -->
+      <a-entity position="-7 1.2 -7.5">
+        <a-cylinder radius="0.08" height="2.4"
+          material="shader: standard; color:#07070d; metalness:0.5; roughness:0.4; emissive:#00F0FF; emissiveIntensity:0.9">
+        </a-cylinder>
+        <a-entity light="type: point; intensity: 0.7; distance: 9; color: #00F0FF" position="0 1.2 0"></a-entity>
+      </a-entity>
 
-      <a-text value="Aim + Trigger"
-        class="ui"
-        align="center"
-        position="0 -0.13 0.03"
-        width="1.8"
-        opacity="0.75"
-        color="#cdd6ff">
-      </a-text>
+      <a-entity position="7 1.2 -7.5">
+        <a-cylinder radius="0.08" height="2.4"
+          material="shader: standard; color:#07070d; metalness:0.5; roughness:0.4; emissive:#FF4FD8; emissiveIntensity:0.9">
+        </a-cylinder>
+        <a-entity light="type: point; intensity: 0.6; distance: 9; color: #FF4FD8" position="0 1.2 0"></a-entity>
+      </a-entity>
     </a-entity>
 
-    <!-- Blocks container -->
-    <a-entity id="blocks"></a-entity>
+    <!-- Player rig -->
+    <a-entity id="rig" position="0 0 4"
+      smooth-locomotion="leftHand: #leftHand; rightHand: #rightHand; moveSpeed: 2.3; turnSpeed: 70; deadzone: 0.15;"
+      controller-actions="rightHand: #rightHand; leftHand: #leftHand; mindmapRoot: #mindmapRoot;">
+
+      <a-entity id="camera"
+        camera
+        position="0 1.6 0"
+        look-controls="pointerLockEnabled: false"
+        wasd-controls="acceleration: 28">
+      </a-entity>
+
+      <!-- Left controller -->
+      <a-entity id="leftHand"
+        oculus-touch-controls="hand: left"
+        raycaster="objects: .interactable; far: 30; interval: 0"
+        line="color: #00F0FF; opacity: 0.55"
+        super-hands="colliderEvent: raycaster-intersection; colliderEventProperty: els; colliderEndEvent: raycaster-intersection-cleared; colliderEndEventProperty: clearedEls;">
+      </a-entity>
+
+      <!-- Right controller -->
+      <a-entity id="rightHand"
+        oculus-touch-controls="hand: right"
+        raycaster="objects: .interactable; far: 30; interval: 0"
+        line="color: #FF4FD8; opacity: 0.55"
+        super-hands="colliderEvent: raycaster-intersection; colliderEventProperty: els; colliderEndEvent: raycaster-intersection-cleared; colliderEndEventProperty: clearedEls;">
+      </a-entity>
+    </a-entity>
+
+    <!-- Mind map root -->
+    <a-entity id="mindmapRoot" mindmap="src: #mindmap-json;"></a-entity>
+
+    <!-- Selection ring -->
+    <a-entity id="selectionRing" visible="false" selection-ring></a-entity>
 
     <script>
       // ----------------------------
-      // Rounded plane helper
+      // Utilities
       // ----------------------------
-      AFRAME.registerComponent('rounded', {
-        schema: { radius: { default: 0.08 } },
-        init() {
-          const el = this.el;
-          const mesh = el.getObject3D('mesh');
-          if (!mesh || !mesh.geometry) return requestAnimationFrame(() => this.init());
-
-          const w = el.getAttribute('geometry').width || 1;
-          const h = el.getAttribute('geometry').height || 1;
-          const r = Math.min(this.data.radius, Math.min(w, h) * 0.5);
-
-          const shape = new THREE.Shape();
-          const hw = w / 2, hh = h / 2;
-
-          shape.moveTo(-hw + r, -hh);
-          shape.lineTo(hw - r, -hh);
-          shape.quadraticCurveTo(hw, -hh, hw, -hh + r);
-          shape.lineTo(hw, hh - r);
-          shape.quadraticCurveTo(hw, hh, hw - r, hh);
-          shape.lineTo(-hw + r, hh);
-          shape.quadraticCurveTo(-hw, hh, -hw, hh - r);
-          shape.lineTo(-hw, -hh + r);
-          shape.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
-
-          const newGeom = new THREE.ShapeGeometry(shape, 24);
-          mesh.geometry.dispose();
-          mesh.geometry = newGeom;
-        }
-      });
+      const V3 = (x=0,y=0,z=0)=> new THREE.Vector3(x,y,z);
+      const clamp = (v,a,b)=> Math.min(b, Math.max(a, v));
+      const rand = (a,b)=> a + Math.random()*(b-a);
+      const niceId = (prefix="n")=> prefix + Math.random().toString(16).slice(2, 8);
 
       // ----------------------------
-      // Billboard labels
+      // Procedural grid texture for floor
       // ----------------------------
-      AFRAME.registerComponent('billboard', {
-        schema: { target: { type: 'selector', default: '#camera' } },
-        tick() {
-          const t = this.data.target;
-          if (!t) return;
-          this.el.object3D.lookAt(
-            t.object3D.getWorldPosition(new THREE.Vector3())
-          );
-        }
-      });
-
-      // ----------------------------
-      // Thumbstick locomotion (reliable on Quest)
-      // ----------------------------
-      AFRAME.registerComponent('thumbstick-locomotion', {
+      AFRAME.registerComponent('procedural-grid', {
         schema: {
-          target: { type: 'selector' },
-          speed: { default: 2.0 },
-          deadzone: { default: 0.12 }
+          size: { type: 'number', default: 40 },
+          lines: { type: 'number', default: 40 },
+          majorEvery: { type: 'number', default: 5 },
+          minorColor: { type: 'string', default: 'rgba(0,240,255,0.08)' },
+          majorColor: { type: 'string', default: 'rgba(0,240,255,0.18)' }
         },
         init() {
-          this.axis = { x: 0, y: 0 };
-          this.el.addEventListener('thumbstickmoved', (evt) => {
-            this.axis.x = evt.detail.x || 0;
-            this.axis.y = evt.detail.y || 0;
+          const canvas = document.createElement('canvas');
+          canvas.width = 1024;
+          canvas.height = 1024;
+          const ctx = canvas.getContext('2d');
+
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          ctx.fillStyle = 'rgba(0,0,0,0)';
+          ctx.fillRect(0,0,canvas.width,canvas.height);
+
+          const N = this.data.lines;
+          const step = canvas.width / N;
+
+          for (let i=0;i<=N;i++){
+            const isMajor = (i % this.data.majorEvery) === 0;
+
+            ctx.strokeStyle = isMajor ? this.data.majorColor : this.data.minorColor;
+            ctx.lineWidth = isMajor ? 2 : 1;
+
+            // vertical
+            ctx.beginPath();
+            ctx.moveTo(i*step, 0);
+            ctx.lineTo(i*step, canvas.height);
+            ctx.stroke();
+
+            // horizontal
+            ctx.beginPath();
+            ctx.moveTo(0, i*step);
+            ctx.lineTo(canvas.width, i*step);
+            ctx.stroke();
+          }
+
+          // subtle vignette
+          const g = ctx.createRadialGradient(512,512,120,512,512,520);
+          g.addColorStop(0, 'rgba(0,0,0,0)');
+          g.addColorStop(1, 'rgba(0,0,0,0.45)');
+          ctx.fillStyle = g;
+          ctx.fillRect(0,0,canvas.width,canvas.height);
+
+          const texture = new THREE.CanvasTexture(canvas);
+          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+          texture.repeat.set(this.data.size/6, this.data.size/6);
+          texture.anisotropy = 8;
+
+          const mesh = this.el.getObject3D('mesh');
+          if (!mesh) { this.el.addEventListener('object3dset', () => this.apply(texture), { once: true }); return; }
+          this.apply(texture);
+        },
+        apply(texture) {
+          const mesh = this.el.getObject3D('mesh');
+          if (!mesh) return;
+          mesh.material.map = texture;
+          mesh.material.transparent = true;
+          mesh.material.needsUpdate = true;
+        }
+      });
+
+      // ----------------------------
+      // Starfield
+      // ----------------------------
+      AFRAME.registerComponent('starfield', {
+        schema: { radius: {type:'number', default: 50}, count: {type:'int', default: 1200} },
+        init() {
+          const {radius, count} = this.data;
+          const geom = new THREE.BufferGeometry();
+          const positions = new Float32Array(count * 3);
+
+          for (let i=0;i<count;i++){
+            // random point on a shell (biased slightly outward)
+            const u = Math.random();
+            const v = Math.random();
+            const theta = 2*Math.PI*u;
+            const phi = Math.acos(2*v - 1);
+            const r = radius * rand(0.70, 1.00);
+
+            positions[i*3+0] = r * Math.sin(phi) * Math.cos(theta);
+            positions[i*3+1] = r * Math.cos(phi);
+            positions[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+          }
+
+          geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+          const mat = new THREE.PointsMaterial({
+            size: 0.06,
+            sizeAttenuation: true,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false
           });
+
+          const points = new THREE.Points(geom, mat);
+          this.el.setObject3D('mesh', points);
         },
-        tick(t, dt) {
-          const target = this.data.target;
-          if (!target) return;
-
-          let ax = this.axis.x;
-          let ay = this.axis.y;
-
-          const dz = this.data.deadzone;
-          if (Math.abs(ax) < dz) ax = 0;
-          if (Math.abs(ay) < dz) ay = 0;
-          if (!ax && !ay) return;
-
-          const rig = target.object3D;
-
-          // Move relative to camera yaw
-          const cam = document.querySelector('#camera');
-          const yaw = cam ? cam.object3D.rotation.y : 0;
-
-          const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-          const right   = new THREE.Vector3(1, 0,  0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-
-          const move = new THREE.Vector3()
-            .addScaledVector(right, ax)
-            .addScaledVector(forward, -ay);
-
-          const seconds = (dt || 16) / 1000;
-          rig.position.addScaledVector(move, this.data.speed * seconds);
+        tick(t) {
+          // slow drift for “alive” feel
+          const obj = this.el.object3D;
+          obj.rotation.y = t * 0.00002;
+          obj.rotation.x = Math.sin(t * 0.00003) * 0.02;
         }
       });
 
       // ----------------------------
-      // Ray grab: aim + trigger => drag along ray
+      // Neon frame (simple rectangle made from thin boxes)
       // ----------------------------
-      AFRAME.registerComponent('raygrab', {
+      AFRAME.registerComponent('neon-frame', {
+        schema: { w:{type:'number', default: 10}, h:{type:'number', default: 3}, color:{type:'string', default:'#00F0FF'} },
+        init() {
+          const {w,h,color} = this.data;
+          const mk = (pos, scale) => {
+            const e = document.createElement('a-box');
+            e.setAttribute('position', pos);
+            e.setAttribute('scale', scale);
+            e.setAttribute('material', `shader: standard; color:#07070d; metalness:0.4; roughness:0.25; emissive:${color}; emissiveIntensity: 1.1;`);
+            e.setAttribute('opacity','0.95');
+            e.setAttribute('transparent','true');
+            e.setAttribute('animation__pulse', 'property: material.emissiveIntensity; dir: alternate; dur: 1400; loop: true; to: 1.45; easing: easeInOutSine');
+            this.el.appendChild(e);
+          };
+          // top, bottom, left, right
+          mk(`0 ${h/2} 0`, `${w} 0.06 0.06`);
+          mk(`0 ${-h/2} 0`, `${w} 0.06 0.06`);
+          mk(`${-w/2} 0 0`, `0.06 ${h} 0.06`);
+          mk(`${w/2} 0 0`, `0.06 ${h} 0.06`);
+        }
+      });
+
+      // ----------------------------
+      // Dynamic 3D line between two entities (updates in real-time)
+      // ----------------------------
+      AFRAME.registerComponent('dynamic-link', {
         schema: {
-          spawnSelector: { type: 'selector' },
-          maxDistance: { default: 10 }
+          from: { type: 'selector' },
+          to: { type: 'selector' },
+          color: { default: '#00F0FF' },
+          thickness: { type: 'number', default: 0.01 },
+          opacity: { type: 'number', default: 0.9 }
         },
         init() {
-          this.grabbed = null;
-          this.grabDistance = 2.0;
+          const geom = new THREE.BufferGeometry();
+          const positions = new Float32Array(6);
+          geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-          this.onDown = this.onDown.bind(this);
-          this.onUp = this.onUp.bind(this);
+          const mat = new THREE.LineBasicMaterial({
+            color: new THREE.Color(this.data.color),
+            transparent: true,
+            opacity: this.data.opacity
+          });
 
-          this.el.addEventListener('triggerdown', this.onDown);
-          this.el.addEventListener('gripdown', this.onDown);
-          this.el.addEventListener('triggerup', this.onUp);
-          this.el.addEventListener('gripup', this.onUp);
+          const line = new THREE.Line(geom, mat);
+          this.el.setObject3D('mesh', line);
 
-          // Desktop fallback
-          this.el.addEventListener('mousedown', this.onDown);
-          this.el.addEventListener('mouseup', this.onUp);
+          this._a = new THREE.Vector3();
+          this._b = new THREE.Vector3();
         },
+        update() {
+          const obj = this.el.getObject3D('mesh');
+          if (obj && obj.material) {
+            obj.material.color = new THREE.Color(this.data.color);
+            obj.material.opacity = this.data.opacity;
+            obj.material.needsUpdate = true;
+          }
+        },
+        tick() {
+          const {from, to} = this.data;
+          if (!from || !to) return;
 
-        findTargetFromIntersection(intersection) {
-          if (!intersection || !intersection.object) return null;
-          let el = intersection.object.el;
-          while (el && el !== this.el.sceneEl) {
-            if (el.classList && (el.classList.contains('interactable') || el.classList.contains('ui'))) return el;
-            el = el.parentEl;
+          from.object3D.getWorldPosition(this._a);
+          to.object3D.getWorldPosition(this._b);
+
+          const geom = this.el.getObject3D('mesh').geometry;
+          const arr = geom.attributes.position.array;
+
+          arr[0] = this._a.x; arr[1] = this._a.y; arr[2] = this._a.z;
+          arr[3] = this._b.x; arr[4] = this._b.y; arr[5] = this._b.z;
+
+          geom.attributes.position.needsUpdate = true;
+        }
+      });
+
+      // ----------------------------
+      // Node visual: futuristic “orb + ring + label”
+      // ----------------------------
+      AFRAME.registerComponent('mind-node', {
+        schema: {
+          label: { default: 'Node' },
+          color: { default: '#00F0FF' },
+          size:  { type:'number', default: 0.16 }
+        },
+        init() {
+          const {label, color, size} = this.data;
+
+          this.el.classList.add('interactable');
+
+          // core orb
+          const orb = document.createElement('a-sphere');
+          orb.setAttribute('radius', size);
+          orb.setAttribute('segments-width', 28);
+          orb.setAttribute('segments-height', 18);
+          orb.setAttribute('material',
+            `shader: standard; color:#07070d; metalness:0.65; roughness:0.18; emissive:${color}; emissiveIntensity: 0.95;`);
+          orb.setAttribute('animation__pulse', 'property: material.emissiveIntensity; dir: alternate; dur: 900; loop: true; to: 1.35; easing: easeInOutSine');
+          this.el.appendChild(orb);
+
+          // ring
+          const ring = document.createElement('a-torus');
+          ring.setAttribute('radius', size * 1.25);
+          ring.setAttribute('radius-tubular', Math.max(0.006, size * 0.06));
+          ring.setAttribute('segments-tubular', 48);
+          ring.setAttribute('rotation', '90 0 0');
+          ring.setAttribute('material',
+            `shader: standard; color:#050510; metalness:0.25; roughness:0.35; emissive:${color}; emissiveIntensity: 1.05; opacity: 0.85; transparent:true;`);
+          ring.setAttribute('animation__spin', 'property: rotation; to: 90 360 0; loop: true; dur: 8000; easing: linear');
+          this.el.appendChild(ring);
+
+          // label plate
+          const plate = document.createElement('a-plane');
+          plate.setAttribute('position', `0 ${size*1.5} 0`);
+          plate.setAttribute('width', clamp(label.length * 0.12, 0.8, 2.3));
+          plate.setAttribute('height', 0.36);
+          plate.setAttribute('material', 'shader: standard; color:#02020a; metalness:0.15; roughness:0.9; emissive:#00131a; emissiveIntensity:0.7; opacity:0.75; transparent:true;');
+          this.el.appendChild(plate);
+
+          const txt = document.createElement('a-text');
+          txt.setAttribute('value', label);
+          txt.setAttribute('align', 'center');
+          txt.setAttribute('width', 2.8);
+          txt.setAttribute('color', color);
+          txt.setAttribute('position', `0 ${size*1.5} 0.02`);
+          this.el.appendChild(txt);
+
+          // Interaction affordances (super-hands)
+          this.el.setAttribute('hoverable', '');
+          this.el.setAttribute('grabbable', 'usePhysics: false; suppressY: false');
+          this.el.setAttribute('draggable', '');
+          this.el.setAttribute('droppable', '');
+        }
+      });
+
+      // ----------------------------
+      // Mindmap: build nodes & links from JSON
+      // ----------------------------
+      AFRAME.registerComponent('mindmap', {
+        schema: { src: { type:'selector' } },
+        init() {
+          this.nodes = new Map();
+          this.links = [];
+          this.rebuild();
+        },
+        readJSON() {
+          const el = this.data.src;
+          if (!el) return null;
+          try {
+            return JSON.parse(el.textContent.trim());
+          } catch (e) {
+            console.warn('Invalid mindmap JSON', e);
+            return null;
+          }
+        },
+        clear() {
+          // remove children (nodes & links)
+          while (this.el.firstChild) this.el.removeChild(this.el.firstChild);
+          this.nodes.clear();
+          this.links = [];
+        },
+        rebuild() {
+          const data = this.readJSON();
+          if (!data) return;
+
+          this.clear();
+
+          // nodes
+          (data.nodes || []).forEach(n => {
+            const nodeEl = document.createElement('a-entity');
+            nodeEl.setAttribute('id', n.id);
+            nodeEl.setAttribute('position', `${n.pos?.[0] ?? 0} ${n.pos?.[1] ?? 1.6} ${n.pos?.[2] ?? -3}`);
+            nodeEl.setAttribute('mind-node', `label: ${n.label ?? n.id}; color: ${n.color ?? '#00F0FF'}; size: ${n.size ?? 0.16}`);
+            this.el.appendChild(nodeEl);
+            this.nodes.set(n.id, nodeEl);
+          });
+
+          // links
+          (data.links || []).forEach((l, idx) => {
+            const a = this.nodes.get(l.from);
+            const b = this.nodes.get(l.to);
+            if (!a || !b) return;
+
+            const linkEl = document.createElement('a-entity');
+            linkEl.setAttribute('id', `link_${idx}_${l.from}_${l.to}`);
+            linkEl.setAttribute('dynamic-link', `from: #${l.from}; to: #${l.to}; color: ${l.color ?? '#00F0FF'}; opacity: ${l.opacity ?? 0.9}; thickness: ${l.thickness ?? 0.01}`);
+            this.el.appendChild(linkEl);
+            this.links.push({ from: l.from, to: l.to, el: linkEl });
+          });
+        }
+      });
+
+      // ----------------------------
+      // Selection ring visual
+      // ----------------------------
+      AFRAME.registerComponent('selection-ring', {
+        init() {
+          this.ring = document.createElement('a-torus');
+          this.ring.setAttribute('radius', 0.26);
+          this.ring.setAttribute('radius-tubular', 0.012);
+          this.ring.setAttribute('rotation', '90 0 0');
+          this.ring.setAttribute('material', 'shader: standard; color:#050510; metalness:0.2; roughness:0.25; emissive:#00F0FF; emissiveIntensity: 1.4; opacity:0.9; transparent:true;');
+          this.ring.setAttribute('animation__spin', 'property: rotation; to: 90 360 0; loop: true; dur: 2600; easing: linear');
+          this.el.appendChild(this.ring);
+        },
+        setTarget(nodeEl) {
+          if (!nodeEl) { this.el.setAttribute('visible', 'false'); return; }
+          this.el.object3D.position.set(0,0,0);
+          nodeEl.object3D.add(this.el.object3D);
+          this.el.setAttribute('visible', 'true');
+          this.el.object3D.position.set(0, 0, 0);
+        }
+      });
+
+      // ----------------------------
+      // Smooth locomotion for Quest:
+      // left stick = move, right stick = snap-smooth turn
+      // ----------------------------
+      AFRAME.registerComponent('smooth-locomotion', {
+        schema: {
+          leftHand: { type:'selector' },
+          rightHand:{ type:'selector' },
+          moveSpeed:{ type:'number', default: 2.0 },
+          turnSpeed:{ type:'number', default: 60 },
+          deadzone:{ type:'number', default: 0.15 }
+        },
+        init() {
+          this._move = { x:0, y:0 };
+          this._turn = { x:0, y:0 };
+          this._tmp = new THREE.Vector3();
+
+          const lh = this.data.leftHand;
+          const rh = this.data.rightHand;
+
+          if (lh) {
+            lh.addEventListener('thumbstickmoved', (e) => { this._move.x = e.detail.x; this._move.y = e.detail.y; });
+            lh.addEventListener('thumbstickup', () => { this._move.x = 0; this._move.y = 0; });
+          }
+          if (rh) {
+            rh.addEventListener('thumbstickmoved', (e) => { this._turn.x = e.detail.x; this._turn.y = e.detail.y; });
+            rh.addEventListener('thumbstickup', () => { this._turn.x = 0; this._turn.y = 0; });
+          }
+        },
+        tick(_, dtMs) {
+          const dt = Math.min(0.05, dtMs/1000);
+          const dz = this.data.deadzone;
+
+          // Move (relative to camera yaw)
+          const mx = Math.abs(this._move.x) > dz ? this._move.x : 0;
+          const my = Math.abs(this._move.y) > dz ? this._move.y : 0;
+
+          if (mx || my) {
+            const cam = this.el.querySelector('[camera]');
+            if (cam) {
+              const yaw = cam.object3D.rotation.y;
+              const forward = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+              const right = new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+              this._tmp.copy(forward).multiplyScalar(-my).add(right.multiplyScalar(mx)).normalize();
+
+              const spd = this.data.moveSpeed;
+              this.el.object3D.position.addScaledVector(this._tmp, spd * dt);
+            }
+          }
+
+          // Turn (right stick X)
+          const tx = Math.abs(this._turn.x) > dz ? this._turn.x : 0;
+          if (tx) {
+            const turn = this.data.turnSpeed * dt * tx;
+            this.el.object3D.rotation.y -= THREE.MathUtils.degToRad(turn);
+          }
+        }
+      });
+
+      // ----------------------------
+      // Controller actions:
+      // Trigger selects node under right ray.
+      // A: add new node linked to selected.
+      // Y: set “link-from”; next selection links.
+      // B: delete selected.
+      // ----------------------------
+      AFRAME.registerComponent('controller-actions', {
+        schema: {
+          rightHand: { type:'selector' },
+          leftHand:  { type:'selector' },
+          mindmapRoot:{ type:'selector' }
+        },
+        init() {
+          this.selected = null;
+          this.linkFrom = null;
+          this.mm = this.data.mindmapRoot;
+          this.ray = this.data.rightHand;
+          this.selectionRing = document.querySelector('#selectionRing')?.components['selection-ring'];
+
+          const rh = this.data.rightHand;
+          if (!rh) return;
+
+          rh.addEventListener('triggerdown', () => this.selectFromRay());
+          rh.addEventListener('abuttondown', () => this.addNodeLinked());
+          rh.addEventListener('ybuttondown', () => this.toggleLinkFrom());
+          rh.addEventListener('bbuttondown', () => this.deleteSelected());
+
+          // little haptic tick when possible
+          this._haptic = (strength=0.2, dur=40) => {
+            const ctrl = rh.components['oculus-touch-controls']?.controller;
+            if (!ctrl?.gamepad?.hapticActuators?.length) return;
+            try { ctrl.gamepad.hapticActuators[0].pulse(strength, dur); } catch {}
+          };
+        },
+        getHitNode() {
+          const ray = this.ray?.components?.raycaster;
+          if (!ray) return null;
+          const hits = ray.intersections;
+          if (!hits || !hits.length) return null;
+
+          // Find the closest entity with class "interactable"
+          for (const h of hits) {
+            const obj = h.object;
+            let el = obj?.el;
+            while (el && el !== this.el.sceneEl) {
+              if (el.classList && el.classList.contains('interactable')) return el;
+              el = el.parentEl;
+            }
           }
           return null;
         },
+        selectFromRay() {
+          const node = this.getHitNode();
+          if (!node) return;
 
-        onDown() {
-          const rc = this.el.components.raycaster;
-          if (!rc || !rc.intersections || !rc.intersections.length) return;
-
-          const hit = rc.intersections[0];
-          const target = this.findTargetFromIntersection(hit);
-          if (!target) return;
-
-          // UI Spawn button
-          const spawnBtn = this.data.spawnSelector;
-          if (spawnBtn && (target === spawnBtn || spawnBtn.contains(target))) {
-            window.spawnRandomBlock?.();
-            spawnBtn.setAttribute(
-              'animation__pulse',
-              'property: scale; to: 1.08 1.08 1; dur: 90; dir: alternate; loop: 2; easing: easeOutQuad'
-            );
-            return;
+          // If linking mode is armed, create link and clear linkFrom
+          if (this.linkFrom && this.linkFrom !== node) {
+            this.createLink(this.linkFrom, node);
+            this.linkFrom = null;
           }
 
-          // Climb to root block
-          let root = target;
-          while (root && root !== this.el.sceneEl) {
-            if (root.dataset && root.dataset.blockRoot === '1') break;
-            root = root.parentEl;
+          this.selected = node;
+          this._haptic(0.25, 35);
+
+          // show selection ring
+          if (this.selectionRing) this.selectionRing.setTarget(node);
+
+          // emphasize selected a bit
+          node.setAttribute('animation__sel', 'property: scale; to: 1.08 1.08 1.08; dur: 120; easing: easeOutQuad');
+        },
+        toggleLinkFrom() {
+          if (!this.selected) return;
+          this.linkFrom = this.selected;
+          this._haptic(0.35, 55);
+          // make it obvious
+          this.linkFrom.setAttribute('animation__linkFrom', 'property: rotation; to: 0 360 0; loop: true; dur: 1600; easing: linear');
+        },
+        addNodeLinked() {
+          if (!this.mm) return;
+
+          // Create node in front of camera
+          const cam = document.querySelector('#camera');
+          if (!cam) return;
+
+          const pos = new THREE.Vector3();
+          cam.object3D.getWorldPosition(pos);
+
+          const dir = new THREE.Vector3(0,0,-1).applyQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion())).normalize();
+          const spawn = pos.clone().add(dir.multiplyScalar(1.6));
+          spawn.x += rand(-0.4, 0.4);
+          spawn.y += rand(-0.2, 0.3);
+          spawn.z += rand(-0.4, 0.4);
+
+          const id = niceId('n');
+          const color = ['#00F0FF','#FF4FD8','#7CFF6B','#FFD24D','#9B7CFF'][Math.floor(Math.random()*5)];
+          const label = ['Idea','Branch','Task','Note','Edge','Signal','Hypothesis'][Math.floor(Math.random()*7)];
+
+          const nodeEl = document.createElement('a-entity');
+          nodeEl.setAttribute('id', id);
+          nodeEl.setAttribute('position', `${spawn.x.toFixed(3)} ${spawn.y.toFixed(3)} ${spawn.z.toFixed(3)}`);
+          nodeEl.setAttribute('mind-node', `label: ${label}; color: ${color}; size: 0.15`);
+          this.mm.appendChild(nodeEl);
+
+          // link to selected (if any)
+          if (this.selected) {
+            this.createLink(this.selected, nodeEl, color);
           }
-          if (!root || root === this.el.sceneEl) root = target;
 
-          this.grabbed = root;
-          this.grabDistance = Math.min(hit.distance || 2.0, this.data.maxDistance);
-          root.setAttribute('animation__hover', 'property: scale; to: 1.03 1.03 1.03; dur: 120; easing: easeOutQuad');
+          this.selected = nodeEl;
+          if (this.selectionRing) this.selectionRing.setTarget(nodeEl);
+          this._haptic(0.35, 60);
         },
+        createLink(fromEl, toEl, color='#00F0FF') {
+          if (!this.mm || !fromEl || !toEl) return;
 
-        onUp() {
-          if (!this.grabbed) return;
-          this.grabbed.removeAttribute('animation__hover');
-          this.grabbed = null;
+          // remove the “linkFrom” spin if it exists
+          try { fromEl.removeAttribute('animation__linkFrom'); } catch {}
+
+          const linkEl = document.createElement('a-entity');
+          linkEl.setAttribute('dynamic-link', `from: #${fromEl.id}; to: #${toEl.id}; color: ${color}; opacity: 0.9; thickness: 0.01`);
+          this.mm.appendChild(linkEl);
+          this._haptic(0.28, 45);
         },
+        deleteSelected() {
+          if (!this.selected || !this.mm) return;
 
-        tick() {
-          if (!this.grabbed) return;
+          const id = this.selected.id;
+          // remove links that reference this node
+          const toRemove = [];
+          this.mm.querySelectorAll('[dynamic-link]').forEach(el => {
+            const attr = el.getAttribute('dynamic-link');
+            const fromSel = attr?.from;
+            const toSel = attr?.to;
+            const fromId = typeof fromSel === 'string' ? fromSel.replace('#','') : (fromSel?.id ?? '');
+            const toId   = typeof toSel === 'string' ? toSel.replace('#','') : (toSel?.id ?? '');
+            if (fromId === id || toId === id) toRemove.push(el);
+          });
+          toRemove.forEach(el => el.parentNode && el.parentNode.removeChild(el));
 
-          const rc = this.el.components.raycaster;
-          if (!rc || !rc.raycaster) return;
+          // remove node
+          const gone = this.selected;
+          this.selected = null;
+          this.linkFrom = null;
+          if (this.selectionRing) this.selectionRing.setTarget(null);
 
-          const ray = rc.raycaster.ray;
-          const origin = ray.origin.clone();
-          const dir = ray.direction.clone().normalize();
-
-          const worldPoint = origin.add(dir.multiplyScalar(this.grabDistance));
-
-          const obj3d = this.grabbed.object3D;
-          const parent = obj3d.parent;
-          if (!parent) return;
-
-          parent.worldToLocal(worldPoint);
-          obj3d.position.copy(worldPoint);
+          gone.parentNode && gone.parentNode.removeChild(gone);
+          this._haptic(0.4, 70);
         }
       });
 
       // ----------------------------
-      // Random blocks spawner
+      // Desktop JSON editor wiring
       // ----------------------------
-      const LABELS = [
-        "Вектор мыслей", "Внутренний компас", "Микро-страх", "Режим бога",
-        "Слой препятствий", "Фокус", "Идея", "Смысл", "План", "Поток",
-        "Гипотеза", "Эксперимент", "Инсайт", "Сигнал", "Действие"
-      ];
+      (function setupJSONEditor(){
+        const toggleBtn = document.getElementById('toggleJson');
+        const applyBtn = document.getElementById('applyJson');
+        const box = document.getElementById('jsonBox');
+        const jsonScript = document.getElementById('mindmap-json');
 
-      const rand = (a, b) => a + Math.random() * (b - a);
-      const choice = (arr) => arr[(Math.random() * arr.length) | 0];
+        const mmRoot = document.getElementById('mindmapRoot');
 
-      window.spawnRandomBlock = function () {
-        const container = document.querySelector('#blocks');
-        const cam = document.querySelector('#camera');
+        const syncFromScript = () => { box.value = jsonScript.textContent.trim(); };
+        const applyToScene = () => {
+          try {
+            const parsed = JSON.parse(box.value);
+            jsonScript.textContent = JSON.stringify(parsed, null, 2);
+            const mmComp = mmRoot?.components?.mindmap;
+            if (mmComp) mmComp.rebuild();
+          } catch(e) {
+            alert('JSON error:\n' + e.message);
+          }
+        };
 
-        const label = `${choice(LABELS)} #${((Math.random()*999)|0).toString().padStart(3,'0')}`;
-
-        // Spawn in front of camera
-        const camPos = cam.object3D.getWorldPosition(new THREE.Vector3());
-        const camQuat = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
-
-        const camDir = new THREE.Vector3(0,0,-1).applyQuaternion(camQuat);
-        const forward = camDir.clone().multiplyScalar(rand(1.6, 2.3));
-        const side = new THREE.Vector3(1,0,0).applyQuaternion(camQuat).multiplyScalar(rand(-0.8, 0.8));
-
-        const p = camPos.clone().add(forward).add(side);
-        p.y = rand(0.9, 1.5);
-
-        const w = rand(0.35, 0.65);
-        const h = rand(0.25, 0.55);
-        const d = rand(0.18, 0.38);
-
-        const hue = (Math.random() * 360) | 0;
-        const color = `hsl(${hue} 70% 60%)`;
-
-        const root = document.createElement('a-entity');
-        root.dataset.blockRoot = "1";
-        root.setAttribute('position', `${p.x.toFixed(3)} ${p.y.toFixed(3)} ${p.z.toFixed(3)}`);
-
-        // IMPORTANT FIX:
-        // Put .interactable on the mesh/geometry element (a-box), not only on a parent a-entity.
-        const box = document.createElement('a-box');
-        box.classList.add('interactable');
-        box.setAttribute('width', w.toFixed(3));
-        box.setAttribute('height', h.toFixed(3));
-        box.setAttribute('depth', d.toFixed(3));
-        box.setAttribute('material', `color: ${color}; metalness: 0.15; roughness: 0.35; emissive: #0b1020; emissiveIntensity: 0.25`);
-        box.setAttribute('shadow', 'cast: true; receive: true');
-        root.appendChild(box);
-
-        // Label
-        const labelWrap = document.createElement('a-entity');
-        labelWrap.setAttribute('position', `0 ${(h/2 + 0.18).toFixed(3)} 0`);
-        labelWrap.setAttribute('billboard', 'target: #camera');
-
-        const plate = document.createElement('a-plane');
-        plate.setAttribute('width', Math.max(0.62, w + 0.22).toFixed(3));
-        plate.setAttribute('height', '0.18');
-        plate.setAttribute('material', 'color: #0f1730; opacity: 0.86; metalness: 0.0; roughness: 0.9');
-        plate.setAttribute('position', '0 0 0.01');
-        labelWrap.appendChild(plate);
-
-        const text = document.createElement('a-text');
-        text.setAttribute('value', label);
-        text.setAttribute('align', 'center');
-        text.setAttribute('width', '1.6');
-        text.setAttribute('color', '#eaf0ff');
-        text.setAttribute('position', '0 0 0.02');
-        labelWrap.appendChild(text);
-
-        root.appendChild(labelWrap);
-
-        // Pop animation
-        root.setAttribute('scale', '0.001 0.001 0.001');
-        root.setAttribute('animation__pop', 'property: scale; to: 1 1 1; dur: 140; easing: easeOutBack');
-
-        container.appendChild(root);
-      };
-
-      // HUD buttons
-      window.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('spawnBtn').addEventListener('click', () => window.spawnRandomBlock());
-        document.getElementById('clearBtn').addEventListener('click', () => {
-          const c = document.querySelector('#blocks');
-          while (c.firstChild) c.removeChild(c.firstChild);
+        toggleBtn.addEventListener('click', () => {
+          const open = box.style.display !== 'none';
+          box.style.display = open ? 'none' : 'block';
+          if (!open) syncFromScript();
         });
 
-        // Spawn a couple at start
-        setTimeout(() => window.spawnRandomBlock(), 300);
-        setTimeout(() => window.spawnRandomBlock(), 650);
-      });
+        applyBtn.addEventListener('click', applyToScene);
+      })();
     </script>
   </a-scene>
 </body>
