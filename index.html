@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Noda Minimal Smoke Test (verbose logs)</title>
+  <title>Noda Smoke Test (super verbose)</title>
 
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 16px; }
@@ -17,11 +17,11 @@
     .row { display:flex; gap:10px; flex-wrap:wrap; }
   </style>
 
-  <!-- ТВОЙ noda.js -->
+  <!-- твой noda.js -->
   <script
     src="./noda.js"
-    onload="window.__nodaJsLoaded=true; window.__log('✅ custom noda.js loaded');"
-    onerror="window.__nodaJsError=true; window.__log('❌ custom noda.js failed to load');"
+    onload="window.__nodaJsLoaded=true; window.__log('✅ noda.js loaded');"
+    onerror="window.__nodaJsError=true; window.__log('❌ noda.js failed to load');"
   ></script>
 
   <script>
@@ -43,13 +43,11 @@
       const el = $("log");
       if (!el) return;
       el.textContent = `[${nowTs()}] ${msg}\n` + el.textContent;
-      el.textContent = el.textContent.slice(0, 16000);
+      el.textContent = el.textContent.slice(0, 20000);
     }
     window.__log = __log;
 
-    function logClick(name) {
-      __log(`🖱️ CLICK: ${name}`);
-    }
+    function logClick(name) { __log(`🖱️ CLICK: ${name}`); }
 
     function withTimeout(p, ms, label="timeout") {
       return Promise.race([
@@ -69,7 +67,6 @@
 
       let installed = null;
       let installedOk = false;
-
       if (hasNoda) {
         try {
           installed = window.noda.isInstalled();
@@ -78,7 +75,6 @@
           installed = "ERR: " + String(e);
         }
       }
-
       return { jsLoaded, jsError, hasNoda, installed, installedOk };
     }
 
@@ -101,12 +97,11 @@
         isInstalled(): <span class="mono">${String(st.installed)}</span>
       `);
 
-      // включаем/выключаем кнопки по контексту (но клики всё равно будут логироваться)
       const enabled = st.jsLoaded && st.hasNoda && st.installedOk;
       $("btnClear").disabled = !enabled;
       $("btnOne").disabled = !enabled;
-      $("btnMany").disabled = !enabled;
       $("btnList").disabled = !enabled;
+      $("btnOrigin").disabled = !enabled;
     }
 
     async function safeGetUser() {
@@ -115,11 +110,9 @@
       if (!st.installedOk) throw new Error("isInstalled() is false");
 
       __log("getUser() start…");
-      const user = await withTimeout(window.noda.getUser(), 2000, "getUser timeout");
+      const user = await withTimeout(window.noda.getUser(), 8000, "getUser timeout");
       __log("getUser() result: " + safeStringify(user));
-
-      // НЕ предполагаем поле userId — просто покажем всё
-      $("userId").textContent = safeStringify(user);
+      $("userJson").textContent = safeStringify(user);
       return user;
     }
 
@@ -128,29 +121,22 @@
       if (!st.hasNoda) throw new Error("window.noda missing");
       if (!st.installedOk) throw new Error("isInstalled() is false");
 
-      __log("listNodes() start…");
-      // listNodes в их примере принимает props; можно и пустой объект
-      const res = await withTimeout(window.noda.listNodes({}), 3000, "listNodes timeout");
-      const count = (res && res.nodes && Array.isArray(res.nodes)) ? res.nodes.length : 0;
+      __log("listNodes(null) start…");
+      // IMPORTANT: docs say null returns all nodes
+      const res = await withTimeout(window.noda.listNodes(null), 20000, "listNodes timeout");
+      const count = (res && Array.isArray(res.nodes)) ? res.nodes.length : 0;
 
-      __log(`listNodes() OK: count=${count}`);
-      if (count > 0) {
-        const first = res.nodes[0];
-        __log("first node sample: " + safeStringify(first));
-      }
+      __log(`listNodes OK: count=${count}`);
+      if (count > 0) __log("first node: " + safeStringify(res.nodes[0]));
       return { count, res };
     }
 
     async function clearMap() {
       logClick("Clear map");
       try {
-        const st = getNodaState();
-        if (!st.hasNoda) throw new Error("window.noda missing");
-        if (!st.installedOk) throw new Error("isInstalled() is false");
-
         __log("clearMap() start…");
-        await withTimeout(window.noda.clearMap(), 3000, "clearMap timeout");
-        __log("clearMap() OK");
+        await withTimeout(window.noda.clearMap(), 15000, "clearMap timeout");
+        __log("clearMap OK");
         setBox("status", true, `<b>Status</b><br/>Map cleared`);
       } catch (e) {
         __log("clearMap ERROR: " + String(e));
@@ -158,101 +144,57 @@
       }
     }
 
-    async function createOneHugeNode() {
-      logClick("Create ONE huge node");
+    // вариант 1: relativeTo=User, y=1.3 (уровень глаз), z=-2 (перед тобой)
+    async function createVisibleNode_User() {
+      logClick("Create node (User coords)");
       try {
-        const st = getNodaState();
-        if (!st.hasNoda) throw new Error("window.noda missing");
-        if (!st.installedOk) throw new Error("isInstalled() is false");
-
         const payload = {
-          uuid: "smoke:visible",
-          title: "VISIBLE NODE (relativeTo=User)",
-          color: "F44336",
+          uuid: "smoke:visible:user",
+          title: "VISIBLE (User) y=1.3 z=-2.0",
+          color: "#F44336",
           opacity: 1,
-          shape: "Ball",
-          size: 45,
-          notes: "If you see this — createNode works.",
-          location: { x: 0, y: 0, z: -1.0, relativeTo: "User" }
+          shape: "Box",
+          size: 30,
+          selected: true,
+          notes: "Если не видно — попробуй вариант Origin ниже.",
+          location: { x: 0, y: 1.3, z: -2.0, relativeTo: "User" }
         };
 
-        __log("createNode() payload: " + safeStringify(payload));
-        __log("createNode() start…");
-
-        const node = await withTimeout(window.noda.createNode(payload), 5000, "createNode timeout");
-        __log("createNode() OK: " + safeStringify(node));
-
-        setBox("status", true, `<b>Status</b><br/>Created node: <span class="mono">${node && node.uuid ? node.uuid : "(no uuid)"}</span>`);
-
-        // Проверим, что нода реально “в системе”
-        await listNodesVerbose();
-
+        __log("createNode payload: " + safeStringify(payload));
+        __log("createNode start…");
+        const node = await withTimeout(window.noda.createNode(payload), 20000, "createNode timeout");
+        __log("createNode OK: " + safeStringify(node));
+        setBox("status", true, `<b>Status</b><br/>Created node: <span class="mono">${node?.uuid ?? "(no uuid)"}</span>`);
       } catch (e) {
         __log("createNode ERROR: " + String(e));
         setBox("status", false, `<b>Status</b><br/>createNode ERROR: <span class="mono">${String(e)}</span>`);
       }
     }
 
-    async function createManyNodes() {
-      logClick("Create MANY nodes");
+    // вариант 2: relativeTo=Origin — иногда это “надёжнее” визуально
+    async function createVisibleNode_Origin() {
+      logClick("Create node (Origin coords)");
       try {
-        const st = getNodaState();
-        if (!st.hasNoda) throw new Error("window.noda missing");
-        if (!st.installedOk) throw new Error("isInstalled() is false");
-
-        const N = 60; // поменьше для теста, чтобы точно отработало быстро
-        __log("createManyNodes start N=" + N);
-
-        for (let i = 0; i < N; i++) {
-          const row = i % 10;
-          const col = Math.floor(i / 10);
-
-          const payload = {
-            uuid: "bulk:n" + i,
-            title: "#" + i,
-            color: (i % 3 === 0) ? "2196F3" : (i % 3 === 1) ? "4CAF50" : "FFB020",
-            opacity: 1,
-            shape: (i % 4 === 0) ? "Star" : (i % 4 === 1) ? "Diamond" : (i % 4 === 2) ? "Hourglass" : "Box",
-            size: 10,
-            notes: "bulk " + i,
-            location: {
-              x: (row - 4.5) * 0.18,
-              y: (col - 2.5) * 0.18,
-              z: -1.4 - (i % 4) * 0.15,
-              relativeTo: "User"
-            }
-          };
-
-          __log("createNode #" + i + " start…");
-          await withTimeout(window.noda.createNode(payload), 5000, "createNode timeout #" + i);
-          __log("createNode #" + i + " OK");
-        }
-
-        // link (опционально)
-        const linkPayload = {
-          uuid: "bulk:link",
-          fromUuid: "bulk:n0",
-          toUuid: "bulk:n59",
-          title: "range",
-          color: "171717",
-          shape: "Dash",
-          size: 2,
-          curve: "None",
-          trail: "Ring",
-          selected: false
+        const payload = {
+          uuid: "smoke:visible:origin",
+          title: "VISIBLE (Origin) y=1.3 z=-2.0",
+          color: "#2196F3",
+          opacity: 1,
+          shape: "Ball",
+          size: 30,
+          selected: true,
+          notes: "Origin fallback",
+          location: { x: 0, y: 1.3, z: -2.0, relativeTo: "Origin" }
         };
-        __log("createLink payload: " + safeStringify(linkPayload));
-        __log("createLink start…");
-        await withTimeout(window.noda.createLink(linkPayload), 5000, "createLink timeout");
-        __log("createLink OK");
 
-        setBox("status", true, `<b>Status</b><br/>Created ${N} nodes + 1 link`);
-
-        await listNodesVerbose();
-
+        __log("createNode payload: " + safeStringify(payload));
+        __log("createNode start…");
+        const node = await withTimeout(window.noda.createNode(payload), 20000, "createNode timeout");
+        __log("createNode OK: " + safeStringify(node));
+        setBox("status", true, `<b>Status</b><br/>Created origin node: <span class="mono">${node?.uuid ?? "(no uuid)"}</span>`);
       } catch (e) {
-        __log("createMany ERROR: " + String(e));
-        setBox("status", false, `<b>Status</b><br/>createMany ERROR: <span class="mono">${String(e)}</span>`);
+        __log("createNode ERROR: " + String(e));
+        setBox("status", false, `<b>Status</b><br/>createNode ERROR: <span class="mono">${String(e)}</span>`);
       }
     }
 
@@ -270,12 +212,11 @@
     document.addEventListener("DOMContentLoaded", async () => {
       __log("DOMContentLoaded");
 
-      // События (если они вообще шлются)
+      // события из VR (если реально приходят)
       try {
         if (window.noda) {
           window.noda.onNodeCreated = (n) => __log("EVENT onNodeCreated: " + (n && n.uuid));
           window.noda.onNodeUpdated = (n) => __log("EVENT onNodeUpdated: " + (n && n.uuid));
-          window.noda.onLinkCreated = (l) => __log("EVENT onLinkCreated: " + (l && l.uuid));
           window.noda.onInitialized = () => __log("EVENT onInitialized fired");
         }
       } catch (e) {
@@ -284,20 +225,19 @@
 
       setInterval(snapshot, 300);
 
-      // Попробуем getUser, но не считаем это критичным
       setTimeout(async () => {
         try {
           const st = getNodaState();
           if (st.jsLoaded && st.hasNoda && st.installedOk) {
-            await safeGetUser();
-            setBox("status", true, `<b>Status</b><br/>Ready. (getUser may be missing userId — see User JSON)`);
+            await safeGetUser(); // не критично, но интересно
+            setBox("status", true, `<b>Status</b><br/>Ready`);
           } else {
-            setBox("status", false, `<b>Status</b><br/>Not ready yet (script/noda/context)`);
+            setBox("status", false, `<b>Status</b><br/>Not ready yet`);
           }
         } catch (e) {
-          __log("safeGetUser ERROR (non-fatal): " + String(e));
-          $("userId").textContent = "getUser failed: " + String(e);
-          setBox("status", true, `<b>Status</b><br/>Ready (context ok), but getUser failed/timeout. Try createNode anyway.`);
+          __log("getUser non-fatal: " + String(e));
+          $("userJson").textContent = "getUser failed/timeout: " + String(e);
+          setBox("status", true, `<b>Status</b><br/>Ready (but getUser failed). Try createNode.`);
         }
       }, 700);
     });
@@ -305,7 +245,7 @@
 </head>
 
 <body>
-  <h2>Noda Minimal Smoke Test (verbose)</h2>
+  <h2>Noda Smoke Test (super verbose)</h2>
 
   <div id="script" class="box bad">…</div>
   <div id="obj" class="box bad">…</div>
@@ -315,18 +255,21 @@
 
   <div class="box">
     <b>User JSON:</b>
-    <pre id="userId" class="mono">waiting…</pre>
+    <pre id="userJson" class="mono">waiting…</pre>
+    <div style="margin-top:8px; font-size:12px;">
+      В доках сказано, что должен быть userId, но мы печатаем весь объект как есть. :contentReference[oaicite:2]{index=2}
+    </div>
   </div>
 
   <div class="box">
     <div class="row">
       <button id="btnClear" onclick="clearMap()">Clear map</button>
-      <button id="btnOne" onclick="createOneHugeNode()">Create ONE4444 huge node</button>
-      <button id="btnMany" onclick="createManyNodes()">Create MANY nodes</button>
-      <button id="btnList" onclick="listNodesButton()">List nodes</button>
+      <button id="btnOne" onclick="createVisibleNode_User()">Create node (55555relativeTo=User)</button>
+      <button id="btnOrigin" onclick="createVisibleNode_Origin()">Create node (relativeTo=Origin)</button>
+      <button id="btnList" onclick="listNodesButton()">List nodes (null props)</button>
     </div>
     <div style="margin-top:8px; font-size:12px;">
-      В лог пишется каждый клик + старт/успех/ошибка каждого API-вызова.
+      Если ноды создаются, но не видны — чаще всего проблема в координатах/relativeTo/масштабе.
     </div>
   </div>
 
