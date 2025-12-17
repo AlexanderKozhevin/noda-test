@@ -1,25 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>colorize.cc OS — WebXR Mind Map</title>
+  <title>colorize.cc OS — XR Mind Map</title>
 
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
-  <!-- Super Hands (grab / drag with controllers) -->
-  <script src="https://cdn.jsdelivr.net/npm/aframe-super-hands-component@6.2.3/dist/aframe-super-hands-component.min.js"></script>
-
   <style>
-    html, body { height: 100%; margin: 0; background:#050510; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-    /* Small desktop-only helper UI */
+    html, body { height: 100%; margin: 0; background:#050510; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     #hud {
       position: fixed;
       left: 14px;
       bottom: 14px;
       z-index: 10;
-      width: min(520px, calc(100vw - 28px));
+      width: min(560px, calc(100vw - 28px));
       color: #d7f7ff;
       background: rgba(5, 10, 20, .55);
       border: 1px solid rgba(120, 220, 255, .22);
@@ -29,14 +25,13 @@
       box-shadow: 0 10px 40px rgba(0,0,0,.35);
       user-select: none;
     }
-    #hud .row { display:flex; gap:10px; align-items:center; justify-content:space-between; }
     #hud h3 { margin: 0 0 8px; font-size: 14px; letter-spacing:.4px; color:#8ff0ff; }
-    #hud small { opacity:.85; display:block; margin-top:6px; line-height:1.25; }
+    #hud small { opacity:.88; display:block; margin-top:6px; line-height:1.25; }
     #jsonBox {
       display:none;
       margin-top:10px;
       width:100%;
-      height:180px;
+      height:190px;
       border-radius: 12px;
       border: 1px solid rgba(120, 220, 255, .22);
       background: rgba(0,0,0,.35);
@@ -46,6 +41,15 @@
       font-size: 12px;
       outline:none;
       resize: vertical;
+    }
+    .row { display:flex; gap:10px; align-items:center; justify-content:space-between; }
+    .pill {
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(120, 220, 255, .22);
+      background: rgba(0,0,0,.22);
+      font-size: 12px;
+      opacity: .95;
     }
     button {
       border-radius: 12px;
@@ -57,177 +61,184 @@
     }
     button:hover { background: rgba(0, 200, 255, .16); }
     button:active { transform: translateY(1px); }
-    .pill {
-      padding: 8px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(120, 220, 255, .22);
-      background: rgba(0,0,0,.22);
-      font-size: 12px;
-      opacity: .95;
-    }
-    @media (max-width: 600px) { #hud { font-size: 12px; } }
   </style>
 </head>
 
 <body>
-  <!-- Desktop helper panel (Quest VR users can ignore this) -->
+  <!-- Desktop helper (в VR скрывается автоматически) -->
   <div id="hud">
-    <h3>colorize.cc OS — Mind Map</h3>
+    <h3>colorize.cc OS — XR Mind Map</h3>
     <div class="row">
-      <div class="pill">Quest: Left stick = move • Right stick = turn</div>
+      <div class="pill">Quest: левый стик — ходьба • правый стик — поворот</div>
       <div style="display:flex; gap:8px;">
         <button id="toggleJson">JSON</button>
         <button id="applyJson">Apply</button>
+        <button id="exportJson">Export</button>
       </div>
     </div>
     <small>
-      Controllers: <b>Trigger</b> selects node • <b>Grip</b> grabs/drags • <b>A</b> adds node (linked) • <b>Y</b> “link-from” mode • <b>B</b> deletes selected.
-      <br/>Desktop: WASD + mouse look.
+      Контроллеры:
+      <b>Trigger</b> — выбрать/нажать UI,
+      <b>Grip</b> — перетаскивать ноды (как “grab”),
+      <b>Y</b> — режим связи (link-from),
+      <b>B</b> — удалить выбранную,
+      <b>A + X (удерживать вместе)</b> — зум/пан/вращение карты (двумя руками).
+      <br/>Подписи: выбери ноду → кнопка <b>Rename</b> на панели → набирай по клавиатуре в VR.
     </small>
     <textarea id="jsonBox" spellcheck="false"></textarea>
   </div>
 
-  <!-- JSON definition (edit this, or use the desktop JSON box) -->
+  <!-- JSON source -->
   <script type="application/json" id="mindmap-json">
   {
     "nodes": [
-      { "id": "core", "label": "Core", "pos": [0, 1.7, -2.5], "color": "#00F0FF", "size": 0.18 },
-      { "id": "ux",   "label": "UX",   "pos": [-1.0, 1.6, -3.3], "color": "#7CFF6B", "size": 0.16 },
-      { "id": "ml",   "label": "ML",   "pos": [1.1, 1.9, -3.4], "color": "#FF4FD8", "size": 0.16 },
-      { "id": "api",  "label": "API",  "pos": [0.0, 1.1, -3.8], "color": "#FFD24D", "size": 0.15 },
-      { "id": "ops",  "label": "Ops",  "pos": [2.1, 1.2, -2.6], "color": "#9B7CFF", "size": 0.15 }
+      { "id": "core", "label": "Core", "pos": [0, 1.7, -3.4], "color": "#00F0FF", "size": 0.18 },
+      { "id": "ux",   "label": "UX",   "pos": [-1.6, 1.6, -4.5], "color": "#7CFF6B", "size": 0.16 },
+      { "id": "ml",   "label": "ML",   "pos": [1.7, 1.9, -4.6], "color": "#FF4FD8", "size": 0.16 },
+      { "id": "api",  "label": "API",  "pos": [0.0, 1.1, -5.4], "color": "#FFD24D", "size": 0.15 },
+      { "id": "ops",  "label": "Ops",  "pos": [2.8, 1.2, -3.6], "color": "#9B7CFF", "size": 0.15 }
     ],
     "links": [
-      { "from": "core", "to": "ux",  "color": "#00F0FF", "thickness": 0.010 },
-      { "from": "core", "to": "ml",  "color": "#00F0FF", "thickness": 0.010 },
-      { "from": "core", "to": "api", "color": "#00F0FF", "thickness": 0.010 },
-      { "from": "core", "to": "ops", "color": "#00F0FF", "thickness": 0.010 },
-      { "from": "api",  "to": "ops", "color": "#FFD24D", "thickness": 0.008 }
+      { "from": "core", "to": "ux",  "color": "#00F0FF", "thickness": 0.012 },
+      { "from": "core", "to": "ml",  "color": "#00F0FF", "thickness": 0.012 },
+      { "from": "core", "to": "api", "color": "#00F0FF", "thickness": 0.012 },
+      { "from": "core", "to": "ops", "color": "#00F0FF", "thickness": 0.012 },
+      { "from": "api",  "to": "ops", "color": "#FFD24D", "thickness": 0.010 }
     ]
   }
   </script>
 
   <a-scene
+    id="scene"
     background="color: #050510"
     renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true;"
-    fog="type: exponential; color: #050510; density: 0.030"
-    xr-mode-ui="enabled: true"
-    vr-mode-ui="enabled: true">
-
-    <!-- Assets (optional) -->
-    <a-assets>
-      <!-- A tiny “glow-ish” texture made in JS and applied via component -->
-    </a-assets>
+    fog="type: exponential; color: #050510; density: 0.022"
+    xr-mode-ui="enabled: true">
 
     <!-- Lights -->
-    <a-entity light="type: ambient; intensity: 0.30; color: #7fdcff"></a-entity>
-    <a-entity light="type: directional; intensity: 0.55; color: #ffffff" position="-1 3 1"></a-entity>
+    <a-entity light="type: ambient; intensity: 0.28; color: #7fdcff"></a-entity>
+    <a-entity light="type: directional; intensity: 0.60; color: #ffffff" position="-1 3 1"></a-entity>
 
-    <!-- Starfield / particles -->
-    <a-entity starfield="radius: 55; count: 1800"></a-entity>
+    <!-- Starfield -->
+    <a-entity starfield="radius: 80; count: 2200"></a-entity>
 
-    <!-- Futuristic room -->
+    <!-- Rectangular futuristic room -->
     <a-entity id="room" position="0 0 0">
       <!-- Floor -->
       <a-plane id="floor"
         rotation="-90 0 0"
-        width="60" height="60"
-        material="shader: standard; color: #07070d; metalness: 0.2; roughness: 0.85"
-        procedural-grid="size: 60; lines: 60; majorEvery: 5; minorColor: rgba(0,240,255,0.08); majorColor: rgba(0,240,255,0.18)">
+        width="48" height="48"
+        material="shader: standard; color: #07070d; metalness: 0.18; roughness: 0.88"
+        procedural-grid="size: 48; lines: 72; majorEvery: 6; minorColor: rgba(0,240,255,0.07); majorColor: rgba(0,240,255,0.16)">
       </a-plane>
 
-      <!-- Soft platform -->
-      <a-cylinder position="0 0.01 -3.2" radius="3.4" height="0.04"
-        material="shader: standard; color: #060612; metalness: 0.35; roughness: 0.55; emissive: #00202a; emissiveIntensity: 0.6">
-      </a-cylinder>
-
-      <!-- Walls / panels -->
-      <a-plane position="0 2.2 -10" width="18" height="6"
-        material="shader: standard; color: #060612; metalness: 0.35; roughness: 0.65; emissive: #03031a; emissiveIntensity: 0.55">
+      <!-- Walls (4 planes) -->
+      <a-plane position="0 4 -18" rotation="0 0 0" width="48" height="10"
+        material="shader: standard; color:#060612; metalness:0.35; roughness:0.65; emissive:#03031a; emissiveIntensity:0.55">
+      </a-plane>
+      <a-plane position="0 4 18" rotation="0 180 0" width="48" height="10"
+        material="shader: standard; color:#060612; metalness:0.20; roughness:0.75; emissive:#010115; emissiveIntensity:0.35; opacity:0.85; transparent:true">
+      </a-plane>
+      <a-plane position="-24 4 0" rotation="0 90 0" width="36" height="10"
+        material="shader: standard; color:#060612; metalness:0.28; roughness:0.70; emissive:#020218; emissiveIntensity:0.45">
+      </a-plane>
+      <a-plane position="24 4 0" rotation="0 -90 0" width="36" height="10"
+        material="shader: standard; color:#060612; metalness:0.28; roughness:0.70; emissive:#020218; emissiveIntensity:0.45">
       </a-plane>
 
-      <!-- Neon frame on wall -->
-      <a-entity neon-frame="w: 14; h: 4.2; color: #00F0FF" position="0 2.2 -9.95"></a-entity>
+      <!-- Ceiling -->
+      <a-plane position="0 9 0" rotation="90 0 0" width="48" height="36"
+        material="shader: standard; color:#050510; metalness:0.05; roughness:1.0; emissive:#050520; emissiveIntensity:0.22">
+      </a-plane>
 
-      <!-- Neon title on wall -->
-      <a-entity position="0 2.9 -9.85">
-        <a-text value="colorize.cc OS"
-          align="center"
-          width="8"
-          color="#8ff0ff"
-          opacity="0.95">
-        </a-text>
+      <!-- Neon trims -->
+      <a-entity neon-rect="w: 46; h: 8.8; z: -17.95; color: #00F0FF" position="0 4 0"></a-entity>
+      <a-entity neon-rect="w: 46; h: 8.8; z: 17.95; color: #FF4FD8" position="0 4 0"></a-entity>
 
-        <!-- Back glow plate -->
-        <a-plane position="0 -0.15 -0.02" width="6.5" height="1.2"
-          material="shader: standard; color: #00131a; emissive: #00F0FF; emissiveIntensity: 0.55; metalness: 0.0; roughness: 1.0; opacity: 0.35; transparent: true">
+      <!-- Wall title block -->
+      <a-entity position="0 5.9 -17.6">
+        <a-text value="colorize.cc OS" align="center" width="10" color="#8ff0ff" opacity="0.98"></a-text>
+        <a-plane position="0 -0.15 -0.02" width="8.2" height="1.25"
+          material="shader: standard; color:#00131a; emissive:#00F0FF; emissiveIntensity:0.60; opacity:0.32; transparent:true; roughness:1.0; metalness:0.0">
         </a-plane>
-
-        <a-entity animation="property: rotation; to: 0 360 0; loop: true; dur: 24000; easing: linear"></a-entity>
-      </a-entity>
-
-      <!-- Side neon pylons -->
-      <a-entity position="-7 1.2 -7.5">
-        <a-cylinder radius="0.08" height="2.4"
-          material="shader: standard; color:#07070d; metalness:0.5; roughness:0.4; emissive:#00F0FF; emissiveIntensity:0.9">
-        </a-cylinder>
-        <a-entity light="type: point; intensity: 0.7; distance: 9; color: #00F0FF" position="0 1.2 0"></a-entity>
-      </a-entity>
-
-      <a-entity position="7 1.2 -7.5">
-        <a-cylinder radius="0.08" height="2.4"
-          material="shader: standard; color:#07070d; metalness:0.5; roughness:0.4; emissive:#FF4FD8; emissiveIntensity:0.9">
-        </a-cylinder>
-        <a-entity light="type: point; intensity: 0.6; distance: 9; color: #FF4FD8" position="0 1.2 0"></a-entity>
       </a-entity>
     </a-entity>
 
+    <!-- Workspace: именно его мы двигаем/масштабируем/вращаем (zoom как в Noda) -->
+    <a-entity id="workspace" position="0 0 0" rotation="0 0 0" scale="1 1 1">
+      <a-entity id="mindmapRoot" mindmap="src: #mindmap-json;"></a-entity>
+    </a-entity>
+
+    <!-- Selection ring -->
+    <a-entity id="selectionRing" visible="false" selection-ring></a-entity>
+
+    <!-- VR Keyboard (скрыта по умолчанию) -->
+    <a-entity id="vrKeyboard" visible="false" vr-keyboard></a-entity>
+
     <!-- Player rig -->
-    <a-entity id="rig" position="0 0 4"
-      smooth-locomotion="leftHand: #leftHand; rightHand: #rightHand; moveSpeed: 2.3; turnSpeed: 70; deadzone: 0.15;"
-      controller-actions="rightHand: #rightHand; leftHand: #leftHand; mindmapRoot: #mindmapRoot;">
+    <a-entity id="rig" position="0 0 10"
+      locomotion="leftHand: #leftHand; rightHand: #rightHand; moveSpeed: 2.5; turnSpeed: 72; deadzone: 0.18;"
+      interaction="leftHand: #leftHand; rightHand: #rightHand; workspace: #workspace; mindmapRoot: #mindmapRoot; keyboard: #vrKeyboard; selectionRing: #selectionRing;">
 
       <a-entity id="camera"
         camera
         position="0 1.6 0"
         look-controls="pointerLockEnabled: false"
-        wasd-controls="acceleration: 28">
+        wasd-controls="acceleration: 26">
       </a-entity>
 
       <!-- Left controller -->
       <a-entity id="leftHand"
         oculus-touch-controls="hand: left"
-        raycaster="objects: .interactable; far: 30; interval: 0"
-        line="color: #00F0FF; opacity: 0.55"
-        super-hands="colliderEvent: raycaster-intersection; colliderEventProperty: els; colliderEndEvent: raycaster-intersection-cleared; colliderEndEventProperty: clearedEls;">
+        raycaster="objects: .hit; far: 35; interval: 0"
+        line="color: #00F0FF; opacity: 0.55">
       </a-entity>
 
       <!-- Right controller -->
       <a-entity id="rightHand"
         oculus-touch-controls="hand: right"
-        raycaster="objects: .interactable; far: 30; interval: 0"
-        line="color: #FF4FD8; opacity: 0.55"
-        super-hands="colliderEvent: raycaster-intersection; colliderEventProperty: els; colliderEndEvent: raycaster-intersection-cleared; colliderEndEventProperty: clearedEls;">
+        raycaster="objects: .hit; far: 35; interval: 0"
+        line="color: #FF4FD8; opacity: 0.55">
       </a-entity>
+
+      <!-- Tool panel (на левой руке, кликается правым лучом) -->
+      <a-entity id="toolPanel" position="-0.18 1.15 -0.45" rotation="0 0 0" tool-panel></a-entity>
     </a-entity>
-
-    <!-- Mind map root -->
-    <a-entity id="mindmapRoot" mindmap="src: #mindmap-json;"></a-entity>
-
-    <!-- Selection ring -->
-    <a-entity id="selectionRing" visible="false" selection-ring></a-entity>
 
     <script>
       // ----------------------------
-      // Utilities
+      // Utils
       // ----------------------------
-      const V3 = (x=0,y=0,z=0)=> new THREE.Vector3(x,y,z);
       const clamp = (v,a,b)=> Math.min(b, Math.max(a, v));
       const rand = (a,b)=> a + Math.random()*(b-a);
-      const niceId = (prefix="n")=> prefix + Math.random().toString(16).slice(2, 8);
+      const niceId = (prefix="n")=> prefix + Math.random().toString(16).slice(2, 9);
+
+      const v3 = (x=0,y=0,z=0)=> new THREE.Vector3(x,y,z);
+
+      function getWorldPos(el, out=new THREE.Vector3()){
+        el.object3D.getWorldPosition(out);
+        return out;
+      }
+
+      function getWorldDirFromCamera(out=new THREE.Vector3()){
+        const cam = document.querySelector('#camera');
+        cam.object3D.getWorldDirection(out);
+        // A-Frame camera forward is -Z in local; getWorldDirection returns forward (-Z) already.
+        return out;
+      }
 
       // ----------------------------
-      // Procedural grid texture for floor
+      // HUD hide in VR
+      // ----------------------------
+      (function(){
+        const hud = document.getElementById('hud');
+        const scene = document.getElementById('scene');
+        scene.addEventListener('enter-vr', () => { hud.style.display = 'none'; });
+        scene.addEventListener('exit-vr',  () => { hud.style.display = 'block'; });
+      })();
+
+      // ----------------------------
+      // Procedural grid for floor
       // ----------------------------
       AFRAME.registerComponent('procedural-grid', {
         schema: {
@@ -239,58 +250,45 @@
         },
         init() {
           const canvas = document.createElement('canvas');
-          canvas.width = 1024;
-          canvas.height = 1024;
+          canvas.width = 1024; canvas.height = 1024;
           const ctx = canvas.getContext('2d');
 
-          ctx.clearRect(0,0,canvas.width,canvas.height);
-          ctx.fillStyle = 'rgba(0,0,0,0)';
-          ctx.fillRect(0,0,canvas.width,canvas.height);
-
+          ctx.clearRect(0,0,1024,1024);
           const N = this.data.lines;
-          const step = canvas.width / N;
+          const step = 1024 / N;
 
           for (let i=0;i<=N;i++){
-            const isMajor = (i % this.data.majorEvery) === 0;
+            const major = (i % this.data.majorEvery) === 0;
+            ctx.strokeStyle = major ? this.data.majorColor : this.data.minorColor;
+            ctx.lineWidth = major ? 2 : 1;
 
-            ctx.strokeStyle = isMajor ? this.data.majorColor : this.data.minorColor;
-            ctx.lineWidth = isMajor ? 2 : 1;
-
-            // vertical
-            ctx.beginPath();
-            ctx.moveTo(i*step, 0);
-            ctx.lineTo(i*step, canvas.height);
-            ctx.stroke();
-
-            // horizontal
-            ctx.beginPath();
-            ctx.moveTo(0, i*step);
-            ctx.lineTo(canvas.width, i*step);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(i*step, 0); ctx.lineTo(i*step, 1024); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i*step); ctx.lineTo(1024, i*step); ctx.stroke();
           }
 
-          // subtle vignette
-          const g = ctx.createRadialGradient(512,512,120,512,512,520);
+          // vignette
+          const g = ctx.createRadialGradient(512,512,140,512,512,600);
           g.addColorStop(0, 'rgba(0,0,0,0)');
-          g.addColorStop(1, 'rgba(0,0,0,0.45)');
+          g.addColorStop(1, 'rgba(0,0,0,0.55)');
           ctx.fillStyle = g;
-          ctx.fillRect(0,0,canvas.width,canvas.height);
+          ctx.fillRect(0,0,1024,1024);
 
-          const texture = new THREE.CanvasTexture(canvas);
-          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-          texture.repeat.set(this.data.size/6, this.data.size/6);
-          texture.anisotropy = 8;
+          const tex = new THREE.CanvasTexture(canvas);
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          tex.repeat.set(this.data.size/6, this.data.size/6);
+          tex.anisotropy = 8;
 
-          const mesh = this.el.getObject3D('mesh');
-          if (!mesh) { this.el.addEventListener('object3dset', () => this.apply(texture), { once: true }); return; }
-          this.apply(texture);
-        },
-        apply(texture) {
-          const mesh = this.el.getObject3D('mesh');
-          if (!mesh) return;
-          mesh.material.map = texture;
-          mesh.material.transparent = true;
-          mesh.material.needsUpdate = true;
+          const apply = () => {
+            const mesh = this.el.getObject3D('mesh');
+            if (!mesh) return;
+            mesh.material.map = tex;
+            mesh.material.transparent = true;
+            mesh.material.needsUpdate = true;
+          };
+
+          if (!this.el.getObject3D('mesh')) {
+            this.el.addEventListener('object3dset', apply, { once:true });
+          } else apply();
         }
       });
 
@@ -305,12 +303,11 @@
           const positions = new Float32Array(count * 3);
 
           for (let i=0;i<count;i++){
-            // random point on a shell (biased slightly outward)
             const u = Math.random();
             const v = Math.random();
             const theta = 2*Math.PI*u;
             const phi = Math.acos(2*v - 1);
-            const r = radius * rand(0.70, 1.00);
+            const r = radius * rand(0.72, 1.00);
 
             positions[i*3+0] = r * Math.sin(phi) * Math.cos(theta);
             positions[i*3+1] = r * Math.cos(phi);
@@ -318,465 +315,974 @@
           }
 
           geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-          const mat = new THREE.PointsMaterial({
-            size: 0.06,
-            sizeAttenuation: true,
-            transparent: true,
-            opacity: 0.9,
-            depthWrite: false
-          });
-
-          const points = new THREE.Points(geom, mat);
-          this.el.setObject3D('mesh', points);
+          const mat = new THREE.PointsMaterial({ size: 0.06, transparent: true, opacity: 0.9, depthWrite: false });
+          this.el.setObject3D('mesh', new THREE.Points(geom, mat));
         },
-        tick(t) {
-          // slow drift for “alive” feel
-          const obj = this.el.object3D;
-          obj.rotation.y = t * 0.00002;
-          obj.rotation.x = Math.sin(t * 0.00003) * 0.02;
+        tick(t){
+          this.el.object3D.rotation.y = t * 0.000018;
+          this.el.object3D.rotation.x = Math.sin(t * 0.00003) * 0.02;
         }
       });
 
       // ----------------------------
-      // Neon frame (simple rectangle made from thin boxes)
+      // Neon rectangle trim (thin emissive boxes)
       // ----------------------------
-      AFRAME.registerComponent('neon-frame', {
-        schema: { w:{type:'number', default: 10}, h:{type:'number', default: 3}, color:{type:'string', default:'#00F0FF'} },
-        init() {
-          const {w,h,color} = this.data;
+      AFRAME.registerComponent('neon-rect', {
+        schema: { w:{type:'number', default: 10}, h:{type:'number', default: 3}, z:{type:'number', default: 0}, color:{type:'string', default:'#00F0FF'} },
+        init(){
+          const {w,h,z,color} = this.data;
           const mk = (pos, scale) => {
             const e = document.createElement('a-box');
             e.setAttribute('position', pos);
             e.setAttribute('scale', scale);
-            e.setAttribute('material', `shader: standard; color:#07070d; metalness:0.4; roughness:0.25; emissive:${color}; emissiveIntensity: 1.1;`);
+            e.setAttribute('material', `shader: standard; color:#07070d; metalness:0.35; roughness:0.22; emissive:${color}; emissiveIntensity: 1.1;`);
             e.setAttribute('opacity','0.95');
             e.setAttribute('transparent','true');
             e.setAttribute('animation__pulse', 'property: material.emissiveIntensity; dir: alternate; dur: 1400; loop: true; to: 1.45; easing: easeInOutSine');
             this.el.appendChild(e);
           };
-          // top, bottom, left, right
-          mk(`0 ${h/2} 0`, `${w} 0.06 0.06`);
-          mk(`0 ${-h/2} 0`, `${w} 0.06 0.06`);
-          mk(`${-w/2} 0 0`, `0.06 ${h} 0.06`);
-          mk(`${w/2} 0 0`, `0.06 ${h} 0.06`);
+          const t = 0.06;
+          mk(`0 ${h/2} ${z}`, `${w} ${t} ${t}`);
+          mk(`0 ${-h/2} ${z}`, `${w} ${t} ${t}`);
+          mk(`${-w/2} 0 ${z}`, `${t} ${h} ${t}`);
+          mk(`${w/2} 0 ${z}`, `${t} ${h} ${t}`);
         }
       });
 
       // ----------------------------
-      // Dynamic 3D line between two entities (updates in real-time)
+      // Links as glowing cylinders (thickness реально работает)
       // ----------------------------
-      AFRAME.registerComponent('dynamic-link', {
+      AFRAME.registerComponent('link-tube', {
         schema: {
           from: { type: 'selector' },
           to: { type: 'selector' },
           color: { default: '#00F0FF' },
-          thickness: { type: 'number', default: 0.01 },
+          thickness: { type: 'number', default: 0.012 },
           opacity: { type: 'number', default: 0.9 }
         },
-        init() {
-          const geom = new THREE.BufferGeometry();
-          const positions = new Float32Array(6);
-          geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-          const mat = new THREE.LineBasicMaterial({
-            color: new THREE.Color(this.data.color),
-            transparent: true,
-            opacity: this.data.opacity
-          });
-
-          const line = new THREE.Line(geom, mat);
-          this.el.setObject3D('mesh', line);
-
+        init(){
+          const cyl = new THREE.Mesh(
+            new THREE.CylinderGeometry(1, 1, 1, 10, 1, true),
+            new THREE.MeshStandardMaterial({
+              color: new THREE.Color('#050510'),
+              emissive: new THREE.Color(this.data.color),
+              emissiveIntensity: 1.2,
+              metalness: 0.2,
+              roughness: 0.35,
+              transparent: true,
+              opacity: this.data.opacity
+            })
+          );
+          this.el.setObject3D('mesh', cyl);
           this._a = new THREE.Vector3();
           this._b = new THREE.Vector3();
+          this._dir = new THREE.Vector3();
+          this._mid = new THREE.Vector3();
+          this._quat = new THREE.Quaternion();
         },
-        update() {
-          const obj = this.el.getObject3D('mesh');
-          if (obj && obj.material) {
-            obj.material.color = new THREE.Color(this.data.color);
-            obj.material.opacity = this.data.opacity;
-            obj.material.needsUpdate = true;
+        update(){
+          const mesh = this.el.getObject3D('mesh');
+          if (mesh?.material){
+            mesh.material.emissive = new THREE.Color(this.data.color);
+            mesh.material.opacity = this.data.opacity;
+            mesh.material.needsUpdate = true;
           }
         },
-        tick() {
-          const {from, to} = this.data;
+        tick(){
+          const {from, to, thickness} = this.data;
           if (!from || !to) return;
 
           from.object3D.getWorldPosition(this._a);
           to.object3D.getWorldPosition(this._b);
 
-          const geom = this.el.getObject3D('mesh').geometry;
-          const arr = geom.attributes.position.array;
+          this._dir.copy(this._b).sub(this._a);
+          const len = this._dir.length();
+          if (len < 0.0001) return;
 
-          arr[0] = this._a.x; arr[1] = this._a.y; arr[2] = this._a.z;
-          arr[3] = this._b.x; arr[4] = this._b.y; arr[5] = this._b.z;
+          this._mid.copy(this._a).add(this._b).multiplyScalar(0.5);
 
-          geom.attributes.position.needsUpdate = true;
+          // Cylinder is Y-up; rotate it to match direction
+          this._dir.normalize();
+          this._quat.setFromUnitVectors(new THREE.Vector3(0,1,0), this._dir);
+
+          const mesh = this.el.getObject3D('mesh');
+          mesh.position.copy(this._mid);
+          mesh.quaternion.copy(this._quat);
+          mesh.scale.set(thickness, len * 0.5, thickness); // cylinder height is 2 when scale.y=1 (because we use unit geom with height=1? safer:)
+          // Actually unit height=1, so full height=1*scale.y; we want full height=len -> scale.y=len
+          mesh.scale.set(thickness, len, thickness);
         }
       });
 
       // ----------------------------
-      // Node visual: futuristic “orb + ring + label”
+      // Node visual (orb + ring + label)
       // ----------------------------
       AFRAME.registerComponent('mind-node', {
-        schema: {
-          label: { default: 'Node' },
-          color: { default: '#00F0FF' },
-          size:  { type:'number', default: 0.16 }
-        },
-        init() {
+        schema: { label:{default:'Node'}, color:{default:'#00F0FF'}, size:{type:'number', default:0.16} },
+        init(){
           const {label, color, size} = this.data;
 
-          this.el.classList.add('interactable');
+          this.el.classList.add('hit','node');
 
-          // core orb
+          // core
           const orb = document.createElement('a-sphere');
+          orb.classList.add('hit');
           orb.setAttribute('radius', size);
           orb.setAttribute('segments-width', 28);
           orb.setAttribute('segments-height', 18);
-          orb.setAttribute('material',
-            `shader: standard; color:#07070d; metalness:0.65; roughness:0.18; emissive:${color}; emissiveIntensity: 0.95;`);
+          orb.setAttribute('material', `shader: standard; color:#07070d; metalness:0.65; roughness:0.18; emissive:${color}; emissiveIntensity:0.95;`);
           orb.setAttribute('animation__pulse', 'property: material.emissiveIntensity; dir: alternate; dur: 900; loop: true; to: 1.35; easing: easeInOutSine');
           this.el.appendChild(orb);
 
           // ring
           const ring = document.createElement('a-torus');
+          ring.classList.add('hit');
           ring.setAttribute('radius', size * 1.25);
           ring.setAttribute('radius-tubular', Math.max(0.006, size * 0.06));
           ring.setAttribute('segments-tubular', 48);
           ring.setAttribute('rotation', '90 0 0');
-          ring.setAttribute('material',
-            `shader: standard; color:#050510; metalness:0.25; roughness:0.35; emissive:${color}; emissiveIntensity: 1.05; opacity: 0.85; transparent:true;`);
-          ring.setAttribute('animation__spin', 'property: rotation; to: 90 360 0; loop: true; dur: 8000; easing: linear');
+          ring.setAttribute('material', `shader: standard; color:#050510; metalness:0.2; roughness:0.35; emissive:${color}; emissiveIntensity:1.15; opacity:0.85; transparent:true;`);
+          ring.setAttribute('animation__spin', 'property: rotation; to: 90 360 0; loop: true; dur: 9000; easing: linear');
           this.el.appendChild(ring);
 
           // label plate
           const plate = document.createElement('a-plane');
-          plate.setAttribute('position', `0 ${size*1.5} 0`);
-          plate.setAttribute('width', clamp(label.length * 0.12, 0.8, 2.3));
+          plate.setAttribute('position', `0 ${size*1.55} 0`);
+          plate.setAttribute('width', clamp(label.length * 0.12, 0.8, 2.6));
           plate.setAttribute('height', 0.36);
-          plate.setAttribute('material', 'shader: standard; color:#02020a; metalness:0.15; roughness:0.9; emissive:#00131a; emissiveIntensity:0.7; opacity:0.75; transparent:true;');
+          plate.setAttribute('material', 'shader: standard; color:#02020a; metalness:0.1; roughness:0.9; emissive:#00131a; emissiveIntensity:0.8; opacity:0.72; transparent:true;');
           this.el.appendChild(plate);
 
           const txt = document.createElement('a-text');
           txt.setAttribute('value', label);
           txt.setAttribute('align', 'center');
-          txt.setAttribute('width', 2.8);
+          txt.setAttribute('width', 3.2);
           txt.setAttribute('color', color);
-          txt.setAttribute('position', `0 ${size*1.5} 0.02`);
+          txt.setAttribute('position', `0 ${size*1.55} 0.02`);
+          txt.setAttribute('data-role', 'label');
           this.el.appendChild(txt);
-
-          // Interaction affordances (super-hands)
-          this.el.setAttribute('hoverable', '');
-          this.el.setAttribute('grabbable', 'usePhysics: false; suppressY: false');
-          this.el.setAttribute('draggable', '');
-          this.el.setAttribute('droppable', '');
         }
       });
 
       // ----------------------------
-      // Mindmap: build nodes & links from JSON
+      // Mindmap from JSON
       // ----------------------------
       AFRAME.registerComponent('mindmap', {
         schema: { src: { type:'selector' } },
-        init() {
-          this.nodes = new Map();
-          this.links = [];
+        init(){
           this.rebuild();
         },
-        readJSON() {
+        readJSON(){
           const el = this.data.src;
           if (!el) return null;
-          try {
-            return JSON.parse(el.textContent.trim());
-          } catch (e) {
-            console.warn('Invalid mindmap JSON', e);
-            return null;
-          }
+          try { return JSON.parse(el.textContent.trim()); }
+          catch(e){ console.warn('Bad JSON', e); return null; }
         },
-        clear() {
-          // remove children (nodes & links)
+        clear(){
           while (this.el.firstChild) this.el.removeChild(this.el.firstChild);
-          this.nodes.clear();
-          this.links = [];
         },
-        rebuild() {
+        rebuild(){
           const data = this.readJSON();
           if (!data) return;
-
           this.clear();
 
           // nodes
-          (data.nodes || []).forEach(n => {
+          (data.nodes||[]).forEach(n=>{
             const nodeEl = document.createElement('a-entity');
             nodeEl.setAttribute('id', n.id);
-            nodeEl.setAttribute('position', `${n.pos?.[0] ?? 0} ${n.pos?.[1] ?? 1.6} ${n.pos?.[2] ?? -3}`);
+            nodeEl.setAttribute('position', `${n.pos?.[0] ?? 0} ${n.pos?.[1] ?? 1.6} ${n.pos?.[2] ?? -4}`);
             nodeEl.setAttribute('mind-node', `label: ${n.label ?? n.id}; color: ${n.color ?? '#00F0FF'}; size: ${n.size ?? 0.16}`);
             this.el.appendChild(nodeEl);
-            this.nodes.set(n.id, nodeEl);
           });
 
           // links
-          (data.links || []).forEach((l, idx) => {
-            const a = this.nodes.get(l.from);
-            const b = this.nodes.get(l.to);
+          (data.links||[]).forEach((l, idx)=>{
+            const a = this.el.querySelector(`#${CSS.escape(l.from)}`);
+            const b = this.el.querySelector(`#${CSS.escape(l.to)}`);
             if (!a || !b) return;
 
             const linkEl = document.createElement('a-entity');
-            linkEl.setAttribute('id', `link_${idx}_${l.from}_${l.to}`);
-            linkEl.setAttribute('dynamic-link', `from: #${l.from}; to: #${l.to}; color: ${l.color ?? '#00F0FF'}; opacity: ${l.opacity ?? 0.9}; thickness: ${l.thickness ?? 0.01}`);
+            linkEl.classList.add('link');
+            linkEl.setAttribute('link-tube', `from: #${l.from}; to: #${l.to}; color: ${l.color ?? '#00F0FF'}; thickness: ${l.thickness ?? 0.012}; opacity: ${l.opacity ?? 0.9}`);
+            linkEl.setAttribute('data-from', l.from);
+            linkEl.setAttribute('data-to', l.to);
             this.el.appendChild(linkEl);
-            this.links.push({ from: l.from, to: l.to, el: linkEl });
           });
         }
       });
 
       // ----------------------------
-      // Selection ring visual
+      // Selection ring
       // ----------------------------
       AFRAME.registerComponent('selection-ring', {
-        init() {
-          this.ring = document.createElement('a-torus');
-          this.ring.setAttribute('radius', 0.26);
-          this.ring.setAttribute('radius-tubular', 0.012);
-          this.ring.setAttribute('rotation', '90 0 0');
-          this.ring.setAttribute('material', 'shader: standard; color:#050510; metalness:0.2; roughness:0.25; emissive:#00F0FF; emissiveIntensity: 1.4; opacity:0.9; transparent:true;');
-          this.ring.setAttribute('animation__spin', 'property: rotation; to: 90 360 0; loop: true; dur: 2600; easing: linear');
-          this.el.appendChild(this.ring);
+        init(){
+          const ring = document.createElement('a-torus');
+          ring.setAttribute('radius', 0.28);
+          ring.setAttribute('radius-tubular', 0.012);
+          ring.setAttribute('rotation', '90 0 0');
+          ring.setAttribute('material', 'shader: standard; color:#050510; metalness:0.2; roughness:0.25; emissive:#00F0FF; emissiveIntensity: 1.5; opacity:0.9; transparent:true;');
+          ring.setAttribute('animation__spin', 'property: rotation; to: 90 360 0; loop: true; dur: 2400; easing: linear');
+          this.el.appendChild(ring);
         },
-        setTarget(nodeEl) {
-          if (!nodeEl) { this.el.setAttribute('visible', 'false'); return; }
-          this.el.object3D.position.set(0,0,0);
+        setTarget(nodeEl){
+          if (!nodeEl) { this.el.setAttribute('visible','false'); return; }
+          // attach to node object3D
           nodeEl.object3D.add(this.el.object3D);
-          this.el.setAttribute('visible', 'true');
           this.el.object3D.position.set(0, 0, 0);
+          this.el.setAttribute('visible','true');
         }
       });
 
       // ----------------------------
-      // Smooth locomotion for Quest:
-      // left stick = move, right stick = snap-smooth turn
+      // Locomotion (FIX: направление движения берётся из WORLD-ориентации камеры, поэтому поворот стиком не ломает координаты)
       // ----------------------------
-      AFRAME.registerComponent('smooth-locomotion', {
+      AFRAME.registerComponent('locomotion', {
         schema: {
           leftHand: { type:'selector' },
           rightHand:{ type:'selector' },
-          moveSpeed:{ type:'number', default: 2.0 },
-          turnSpeed:{ type:'number', default: 60 },
-          deadzone:{ type:'number', default: 0.15 }
+          moveSpeed:{ type:'number', default: 2.2 },
+          turnSpeed:{ type:'number', default: 70 },
+          deadzone:{ type:'number', default: 0.18 }
         },
-        init() {
-          this._move = { x:0, y:0 };
-          this._turn = { x:0, y:0 };
+        init(){
+          this._move = {x:0,y:0};
+          this._turn = {x:0,y:0};
           this._tmp = new THREE.Vector3();
+          this._fwd = new THREE.Vector3();
+          this._right = new THREE.Vector3();
 
           const lh = this.data.leftHand;
           const rh = this.data.rightHand;
 
-          if (lh) {
-            lh.addEventListener('thumbstickmoved', (e) => { this._move.x = e.detail.x; this._move.y = e.detail.y; });
-            lh.addEventListener('thumbstickup', () => { this._move.x = 0; this._move.y = 0; });
+          if (lh){
+            lh.addEventListener('thumbstickmoved', e=>{ this._move.x = e.detail.x; this._move.y = e.detail.y; });
+            lh.addEventListener('thumbstickup', ()=>{ this._move.x = 0; this._move.y = 0; });
           }
-          if (rh) {
-            rh.addEventListener('thumbstickmoved', (e) => { this._turn.x = e.detail.x; this._turn.y = e.detail.y; });
-            rh.addEventListener('thumbstickup', () => { this._turn.x = 0; this._turn.y = 0; });
+          if (rh){
+            rh.addEventListener('thumbstickmoved', e=>{ this._turn.x = e.detail.x; this._turn.y = e.detail.y; });
+            rh.addEventListener('thumbstickup', ()=>{ this._turn.x = 0; this._turn.y = 0; });
           }
         },
-        tick(_, dtMs) {
+        tick(_, dtMs){
           const dt = Math.min(0.05, dtMs/1000);
           const dz = this.data.deadzone;
 
-          // Move (relative to camera yaw)
+          // Smooth turn on rig yaw (right stick X)
+          const tx = Math.abs(this._turn.x) > dz ? this._turn.x : 0;
+          if (tx){
+            const turnDeg = this.data.turnSpeed * dt * tx;
+            this.el.object3D.rotation.y -= THREE.MathUtils.degToRad(turnDeg);
+          }
+
+          // Move using camera WORLD direction projected to XZ
           const mx = Math.abs(this._move.x) > dz ? this._move.x : 0;
           const my = Math.abs(this._move.y) > dz ? this._move.y : 0;
+          if (!mx && !my) return;
 
-          if (mx || my) {
-            const cam = this.el.querySelector('[camera]');
-            if (cam) {
-              const yaw = cam.object3D.rotation.y;
-              const forward = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
-              const right = new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
-              this._tmp.copy(forward).multiplyScalar(-my).add(right.multiplyScalar(mx)).normalize();
+          getWorldDirFromCamera(this._fwd);
+          this._fwd.y = 0;
+          if (this._fwd.lengthSq() < 1e-6) return;
+          this._fwd.normalize();
 
-              const spd = this.data.moveSpeed;
-              this.el.object3D.position.addScaledVector(this._tmp, spd * dt);
-            }
-          }
+          this._right.crossVectors(this._fwd, new THREE.Vector3(0,1,0)).normalize();
 
-          // Turn (right stick X)
-          const tx = Math.abs(this._turn.x) > dz ? this._turn.x : 0;
-          if (tx) {
-            const turn = this.data.turnSpeed * dt * tx;
-            this.el.object3D.rotation.y -= THREE.MathUtils.degToRad(turn);
-          }
+          this._tmp.copy(this._fwd).multiplyScalar(-my).add(this._right.multiplyScalar(mx));
+          if (this._tmp.lengthSq() < 1e-6) return;
+          this._tmp.normalize();
+
+          this.el.object3D.position.addScaledVector(this._tmp, this.data.moveSpeed * dt);
         }
       });
 
       // ----------------------------
-      // Controller actions:
-      // Trigger selects node under right ray.
-      // A: add new node linked to selected.
-      // Y: set “link-from”; next selection links.
-      // B: delete selected.
+      // Tool Panel (buttons)
       // ----------------------------
-      AFRAME.registerComponent('controller-actions', {
+      AFRAME.registerComponent('tool-panel', {
+        init(){
+          const makeBtn = (x, y, label, action, tint) => {
+            const btn = document.createElement('a-entity');
+            btn.classList.add('hit','ui');
+            btn.setAttribute('position', `${x} ${y} 0`);
+            btn.setAttribute('ui-button', `label: ${label}; action: ${action}; tint: ${tint};`);
+            this.el.appendChild(btn);
+          };
+
+          // base plate
+          const plate = document.createElement('a-plane');
+          plate.setAttribute('width', '0.68');
+          plate.setAttribute('height','0.52');
+          plate.setAttribute('position','0 0 -0.01');
+          plate.setAttribute('material','shader: standard; color:#02020a; opacity:0.55; transparent:true; roughness:1.0; metalness:0.0; emissive:#00131a; emissiveIntensity:0.65');
+          this.el.appendChild(plate);
+
+          // header text
+          const hdr = document.createElement('a-text');
+          hdr.setAttribute('value','TOOLS');
+          hdr.setAttribute('align','center');
+          hdr.setAttribute('width','1.2');
+          hdr.setAttribute('color','#8ff0ff');
+          hdr.setAttribute('position','0 0.21 0.01');
+          this.el.appendChild(hdr);
+
+          // status text (updated by interaction)
+          const status = document.createElement('a-text');
+          status.setAttribute('value','No node selected');
+          status.setAttribute('align','center');
+          status.setAttribute('width','1.4');
+          status.setAttribute('color','#d7f7ff');
+          status.setAttribute('position','0 0.15 0.01');
+          status.setAttribute('id','toolStatus');
+          this.el.appendChild(status);
+
+          makeBtn(-0.18, 0.00, 'Add',    'add',   '#00F0FF');
+          makeBtn( 0.18, 0.00, 'Link',   'link',  '#FFD24D');
+          makeBtn(-0.18,-0.14, 'Rename', 'rename','#7CFF6B');
+          makeBtn( 0.18,-0.14, 'Delete', 'delete','#FF4FD8');
+          makeBtn( 0.00,-0.28, 'Export', 'export','#9B7CFF');
+
+          // little neon frame
+          const frame = document.createElement('a-entity');
+          frame.setAttribute('neon-rect','w: 0.70; h: 0.54; z: 0.005; color: #00F0FF');
+          frame.setAttribute('position','0 0 0');
+          this.el.appendChild(frame);
+
+          // position relative to camera (panel floats in front-left)
+          this.el.object3D.position.set(-0.45, 1.25, -0.85);
+          this.el.object3D.rotation.set(THREE.MathUtils.degToRad(-8), THREE.MathUtils.degToRad(18), 0);
+        }
+      });
+
+      // ----------------------------
+      // UI Button (emissive, hover, click)
+      // ----------------------------
+      AFRAME.registerComponent('ui-button', {
         schema: {
-          rightHand: { type:'selector' },
-          leftHand:  { type:'selector' },
-          mindmapRoot:{ type:'selector' }
+          label: {default:'Button'},
+          action:{default:'noop'},
+          tint:  {default:'#00F0FF'}
         },
-        init() {
+        init(){
+          const {label, tint} = this.data;
+
+          const box = document.createElement('a-box');
+          box.classList.add('hit','ui');
+          box.setAttribute('width','0.30');
+          box.setAttribute('height','0.10');
+          box.setAttribute('depth','0.03');
+          box.setAttribute('material', `shader: standard; color:#07070d; metalness:0.35; roughness:0.25; emissive:${tint}; emissiveIntensity:0.85; opacity:0.92; transparent:true;`);
+          this.el.appendChild(box);
+
+          const txt = document.createElement('a-text');
+          txt.setAttribute('value', label);
+          txt.setAttribute('align','center');
+          txt.setAttribute('width','1.2');
+          txt.setAttribute('color','#e9fbff');
+          txt.setAttribute('position','0 0 0.03');
+          this.el.appendChild(txt);
+
+          const hoverOn  = () => box.setAttribute('material', `shader: standard; color:#07070d; metalness:0.35; roughness:0.22; emissive:${tint}; emissiveIntensity:1.25; opacity:0.98; transparent:true;`);
+          const hoverOff = () => box.setAttribute('material', `shader: standard; color:#07070d; metalness:0.35; roughness:0.25; emissive:${tint}; emissiveIntensity:0.85; opacity:0.92; transparent:true;`);
+
+          this.el.addEventListener('mouseenter', hoverOn);
+          this.el.addEventListener('mouseleave', hoverOff);
+        }
+      });
+
+      // ----------------------------
+      // VR Keyboard (simple clickable keys)
+      // ----------------------------
+      AFRAME.registerComponent('vr-keyboard', {
+        init(){
+          this.value = '';
+          this.targetNode = null;
+
+          // panel
+          const bg = document.createElement('a-plane');
+          bg.setAttribute('width','1.35');
+          bg.setAttribute('height','0.72');
+          bg.setAttribute('material','shader: standard; color:#02020a; opacity:0.62; transparent:true; emissive:#00131a; emissiveIntensity:0.8; roughness:1.0; metalness:0.0');
+          this.el.appendChild(bg);
+
+          const title = document.createElement('a-text');
+          title.setAttribute('value','Rename node');
+          title.setAttribute('align','center');
+          title.setAttribute('width','2.0');
+          title.setAttribute('color','#8ff0ff');
+          title.setAttribute('position','0 0.30 0.01');
+          this.el.appendChild(title);
+
+          this.display = document.createElement('a-text');
+          this.display.setAttribute('value','');
+          this.display.setAttribute('align','center');
+          this.display.setAttribute('width','2.2');
+          this.display.setAttribute('color','#e9fbff');
+          this.display.setAttribute('position','0 0.22 0.01');
+          this.el.appendChild(this.display);
+
+          const keys = [
+            'Q','W','E','R','T','Y','U','I','O','P',
+            'A','S','D','F','G','H','J','K','L',
+            'Z','X','C','V','B','N','M',
+            'SPACE','BKSP','DONE'
+          ];
+
+          const makeKey = (label, x, y, w=0.12) => {
+            const k = document.createElement('a-entity');
+            k.classList.add('hit','ui','key');
+            k.setAttribute('position', `${x} ${y} 0.01`);
+
+            const box = document.createElement('a-box');
+            box.setAttribute('width', w);
+            box.setAttribute('height','0.08');
+            box.setAttribute('depth','0.03');
+            box.setAttribute('material', 'shader: standard; color:#07070d; metalness:0.2; roughness:0.4; emissive:#00F0FF; emissiveIntensity:0.55; opacity:0.92; transparent:true');
+            k.appendChild(box);
+
+            const t = document.createElement('a-text');
+            t.setAttribute('value', label === 'SPACE' ? 'Space' : label);
+            t.setAttribute('align','center');
+            t.setAttribute('width','1.0');
+            t.setAttribute('color','#e9fbff');
+            t.setAttribute('position','0 0 0.03');
+            k.appendChild(t);
+
+            k.addEventListener('mouseenter', ()=> box.setAttribute('material','shader: standard; color:#07070d; metalness:0.2; roughness:0.35; emissive:#00F0FF; emissiveIntensity:0.95; opacity:0.98; transparent:true'));
+            k.addEventListener('mouseleave', ()=> box.setAttribute('material','shader: standard; color:#07070d; metalness:0.2; roughness:0.4; emissive:#00F0FF; emissiveIntensity:0.55; opacity:0.92; transparent:true'));
+
+            k.addEventListener('click', ()=> this.onKey(label));
+            this.el.appendChild(k);
+          };
+
+          // layout
+          let idx = 0;
+
+          // row1 (10)
+          for (let i=0;i<10;i++,idx++) makeKey(keys[idx], -0.54 + i*0.12, 0.10, 0.11);
+          // row2 (9)
+          for (let i=0;i<9;i++,idx++) makeKey(keys[idx], -0.48 + i*0.12, 0.00, 0.11);
+          // row3 (7)
+          for (let i=0;i<7;i++,idx++) makeKey(keys[idx], -0.36 + i*0.12, -0.10, 0.11);
+
+          // space / bksp / done
+          makeKey('SPACE', -0.22, -0.22, 0.42);
+          makeKey('BKSP',  0.26, -0.22, 0.22);
+          makeKey('DONE',  0.48, -0.22, 0.22);
+
+          // frame
+          const frame = document.createElement('a-entity');
+          frame.setAttribute('neon-rect','w: 1.40; h: 0.76; z: 0.02; color: #00F0FF');
+          this.el.appendChild(frame);
+
+          // place in front of camera by default (interaction component will reposition)
+          this.el.object3D.position.set(0, 1.55, -1.2);
+        },
+        openFor(nodeEl){
+          this.targetNode = nodeEl;
+          this.value = getNodeLabel(nodeEl) || '';
+          this.display.setAttribute('value', this.value || ' ');
+          this.el.setAttribute('visible','true');
+
+          // put keyboard in front of camera
+          const cam = document.querySelector('#camera');
+          const pos = new THREE.Vector3();
+          const dir = new THREE.Vector3();
+          cam.object3D.getWorldPosition(pos);
+          cam.object3D.getWorldDirection(dir);
+          dir.y = 0; dir.normalize();
+
+          const place = pos.clone().add(dir.multiplyScalar(1.1));
+          place.y = 1.55;
+
+          this.el.object3D.position.copy(place);
+          this.el.object3D.lookAt(pos.x, 1.55, pos.z);
+        },
+        close(){
+          this.el.setAttribute('visible','false');
+          this.targetNode = null;
+        },
+        onKey(k){
+          if (!this.targetNode) return;
+          if (k === 'DONE'){
+            setNodeLabel(this.targetNode, this.value.trim() || 'Node');
+            this.close();
+            return;
+          }
+          if (k === 'BKSP'){
+            this.value = this.value.slice(0, -1);
+          } else if (k === 'SPACE'){
+            this.value += ' ';
+          } else {
+            this.value += k;
+          }
+          this.display.setAttribute('value', this.value || ' ');
+        }
+      });
+
+      function getNodeLabel(nodeEl){
+        const t = nodeEl.querySelector('[data-role="label"]');
+        return t ? (t.getAttribute('value') || '') : '';
+      }
+      function setNodeLabel(nodeEl, label){
+        // update mind-node label text and resize plate a bit
+        const t = nodeEl.querySelector('[data-role="label"]');
+        if (t) t.setAttribute('value', label);
+
+        const plate = nodeEl.querySelector('a-plane');
+        if (plate){
+          plate.setAttribute('width', clamp(label.length * 0.12, 0.8, 2.8));
+        }
+      }
+
+      // ----------------------------
+      // Main interaction:
+      // - Trigger: click UI if hit, else select node
+      // - Grip: drag node under ray
+      // - Y: link mode
+      // - B: delete
+      // - A+X held: two-hand zoom/pan/rotate workspace (как Noda)
+      // ----------------------------
+      AFRAME.registerComponent('interaction', {
+        schema: {
+          leftHand: { type:'selector' },
+          rightHand:{ type:'selector' },
+          workspace:{ type:'selector' },
+          mindmapRoot:{ type:'selector' },
+          keyboard: { type:'selector' },
+          selectionRing: { type:'selector' }
+        },
+        init(){
           this.selected = null;
           this.linkFrom = null;
-          this.mm = this.data.mindmapRoot;
-          this.ray = this.data.rightHand;
-          this.selectionRing = document.querySelector('#selectionRing')?.components['selection-ring'];
 
-          const rh = this.data.rightHand;
-          if (!rh) return;
+          this.grab = { left:null, right:null };
+          this.grabOffset = { left:new THREE.Vector3(), right:new THREE.Vector3() };
 
-          rh.addEventListener('triggerdown', () => this.selectFromRay());
-          rh.addEventListener('abuttondown', () => this.addNodeLinked());
-          rh.addEventListener('ybuttondown', () => this.toggleLinkFrom());
-          rh.addEventListener('bbuttondown', () => this.deleteSelected());
+          // world manipulation flags
+          this.aHeld = false;
+          this.xHeld = false;
+          this.worldMode = false;
 
-          // little haptic tick when possible
-          this._haptic = (strength=0.2, dur=40) => {
-            const ctrl = rh.components['oculus-touch-controls']?.controller;
-            if (!ctrl?.gamepad?.hapticActuators?.length) return;
-            try { ctrl.gamepad.hapticActuators[0].pulse(strength, dur); } catch {}
+          this._tmp = new THREE.Vector3();
+          this._tmp2 = new THREE.Vector3();
+          this._tmp3 = new THREE.Vector3();
+
+          this._wm = {
+            startDist: 1,
+            startScale: new THREE.Vector3(1,1,1),
+            startRotY: 0,
+            startPos: new THREE.Vector3(),
+            startMid: new THREE.Vector3(),
+            startVec: new THREE.Vector3()
           };
-        },
-        getHitNode() {
-          const ray = this.ray?.components?.raycaster;
-          if (!ray) return null;
-          const hits = ray.intersections;
-          if (!hits || !hits.length) return null;
 
-          // Find the closest entity with class "interactable"
-          for (const h of hits) {
-            const obj = h.object;
-            let el = obj?.el;
-            while (el && el !== this.el.sceneEl) {
-              if (el.classList && el.classList.contains('interactable')) return el;
+          this.keyboardComp = this.data.keyboard?.components['vr-keyboard'];
+          this.ringComp = this.data.selectionRing?.components['selection-ring'];
+
+          // bind events
+          const lh = this.data.leftHand;
+          const rh = this.data.rightHand;
+
+          const onTrigger = (hand) => () => this.onTriggerDown(hand);
+          const onGripDown = (hand) => () => this.onGripDown(hand);
+          const onGripUp = (hand) => () => this.onGripUp(hand);
+
+          lh.addEventListener('triggerdown', onTrigger('left'));
+          rh.addEventListener('triggerdown', onTrigger('right'));
+
+          lh.addEventListener('gripdown', onGripDown('left'));
+          rh.addEventListener('gripdown', onGripDown('right'));
+          lh.addEventListener('gripup', onGripUp('left'));
+          rh.addEventListener('gripup', onGripUp('right'));
+
+          // link/delete
+          lh.addEventListener('ybuttondown', ()=> this.toggleLinkMode());
+          rh.addEventListener('bbuttondown', ()=> this.deleteSelected());
+
+          // world manipulation A+X
+          rh.addEventListener('abuttondown', ()=> { this.aHeld = true; this.maybeStartWorldMode(); });
+          rh.addEventListener('abuttonup',   ()=> { this.aHeld = false; this.stopWorldModeIfNeeded(); });
+          lh.addEventListener('xbuttondown', ()=> { this.xHeld = true; this.maybeStartWorldMode(); });
+          lh.addEventListener('xbuttonup',   ()=> { this.xHeld = false; this.stopWorldModeIfNeeded(); });
+
+          // UI click bridge: any entity with ui-button listens to click
+          this.el.sceneEl.addEventListener('loaded', ()=> this.updateToolStatus());
+        },
+
+        haptic(handEl, strength=0.2, dur=35){
+          const ctrl = handEl?.components?.['oculus-touch-controls']?.controller;
+          const h = ctrl?.gamepad?.hapticActuators?.[0];
+          if (!h) return;
+          try { h.pulse(strength, dur); } catch {}
+        },
+
+        // -------- Ray hit helpers
+        getHit(handEl, predicateFn){
+          const ray = handEl?.components?.raycaster;
+          if (!ray?.intersections?.length) return null;
+
+          for (const hit of ray.intersections){
+            let el = hit.object?.el;
+            while (el && el !== this.el.sceneEl){
+              if (predicateFn(el)) return el;
               el = el.parentEl;
             }
           }
           return null;
         },
-        selectFromRay() {
-          const node = this.getHitNode();
+
+        isUI(el){ return el.classList?.contains('ui') && el.components?.['ui-button']; },
+        isNode(el){ return el.classList?.contains('node') && el.components?.['mind-node']; },
+
+        onTriggerDown(hand){
+          if (this.worldMode) return; // when world manipulation is active, ignore clicks
+
+          const handEl = (hand === 'left') ? this.data.leftHand : this.data.rightHand;
+
+          // 1) UI click
+          const ui = this.getHit(handEl, (el)=> this.isUI(el));
+          if (ui){
+            ui.emit('click');
+            this.haptic(handEl, 0.25, 30);
+            return;
+          }
+
+          // 2) Select node
+          const node = this.getHit(handEl, (el)=> this.isNode(el));
           if (!node) return;
 
-          // If linking mode is armed, create link and clear linkFrom
-          if (this.linkFrom && this.linkFrom !== node) {
+          // If link mode armed, create link
+          if (this.linkFrom && this.linkFrom !== node){
             this.createLink(this.linkFrom, node);
             this.linkFrom = null;
           }
 
-          this.selected = node;
-          this._haptic(0.25, 35);
-
-          // show selection ring
-          if (this.selectionRing) this.selectionRing.setTarget(node);
-
-          // emphasize selected a bit
-          node.setAttribute('animation__sel', 'property: scale; to: 1.08 1.08 1.08; dur: 120; easing: easeOutQuad');
+          this.selectNode(node);
+          this.haptic(handEl, 0.25, 30);
         },
-        toggleLinkFrom() {
+
+        onGripDown(hand){
+          if (this.worldMode) return;
+
+          const handEl = (hand === 'left') ? this.data.leftHand : this.data.rightHand;
+
+          const node = this.getHit(handEl, (el)=> this.isNode(el));
+          if (!node) return;
+
+          // select and start dragging
+          this.selectNode(node);
+
+          const wp = getWorldPos(handEl, this._tmp);
+          const np = getWorldPos(node, this._tmp2);
+          this.grab[hand] = node;
+          this.grabOffset[hand].copy(np).sub(wp);
+
+          this.haptic(handEl, 0.3, 45);
+        },
+
+        onGripUp(hand){
+          this.grab[hand] = null;
+        },
+
+        selectNode(nodeEl){
+          this.selected = nodeEl;
+          if (this.ringComp) this.ringComp.setTarget(nodeEl);
+          nodeEl.setAttribute('animation__sel','property: scale; to: 1.08 1.08 1.08; dur: 120; easing: easeOutQuad');
+          this.updateToolStatus();
+        },
+
+        updateToolStatus(){
+          const status = document.querySelector('#toolStatus');
+          if (!status) return;
+
+          if (!this.selected){
+            status.setAttribute('value', 'No node selected');
+            return;
+          }
+          const label = getNodeLabel(this.selected) || this.selected.id || 'Node';
+          const mode = this.linkFrom ? 'LINK: pick target' : 'READY';
+          status.setAttribute('value', `${label}  •  ${mode}`);
+        },
+
+        toggleLinkMode(){
           if (!this.selected) return;
           this.linkFrom = this.selected;
-          this._haptic(0.35, 55);
-          // make it obvious
-          this.linkFrom.setAttribute('animation__linkFrom', 'property: rotation; to: 0 360 0; loop: true; dur: 1600; easing: linear');
+          this.updateToolStatus();
+          this.haptic(this.data.leftHand, 0.35, 55);
         },
-        addNodeLinked() {
-          if (!this.mm) return;
 
-          // Create node in front of camera
-          const cam = document.querySelector('#camera');
-          if (!cam) return;
-
-          const pos = new THREE.Vector3();
-          cam.object3D.getWorldPosition(pos);
-
-          const dir = new THREE.Vector3(0,0,-1).applyQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion())).normalize();
-          const spawn = pos.clone().add(dir.multiplyScalar(1.6));
-          spawn.x += rand(-0.4, 0.4);
-          spawn.y += rand(-0.2, 0.3);
-          spawn.z += rand(-0.4, 0.4);
-
-          const id = niceId('n');
-          const color = ['#00F0FF','#FF4FD8','#7CFF6B','#FFD24D','#9B7CFF'][Math.floor(Math.random()*5)];
-          const label = ['Idea','Branch','Task','Note','Edge','Signal','Hypothesis'][Math.floor(Math.random()*7)];
-
-          const nodeEl = document.createElement('a-entity');
-          nodeEl.setAttribute('id', id);
-          nodeEl.setAttribute('position', `${spawn.x.toFixed(3)} ${spawn.y.toFixed(3)} ${spawn.z.toFixed(3)}`);
-          nodeEl.setAttribute('mind-node', `label: ${label}; color: ${color}; size: 0.15`);
-          this.mm.appendChild(nodeEl);
-
-          // link to selected (if any)
-          if (this.selected) {
-            this.createLink(this.selected, nodeEl, color);
-          }
-
-          this.selected = nodeEl;
-          if (this.selectionRing) this.selectionRing.setTarget(nodeEl);
-          this._haptic(0.35, 60);
-        },
-        createLink(fromEl, toEl, color='#00F0FF') {
-          if (!this.mm || !fromEl || !toEl) return;
-
-          // remove the “linkFrom” spin if it exists
-          try { fromEl.removeAttribute('animation__linkFrom'); } catch {}
-
-          const linkEl = document.createElement('a-entity');
-          linkEl.setAttribute('dynamic-link', `from: #${fromEl.id}; to: #${toEl.id}; color: ${color}; opacity: 0.9; thickness: 0.01`);
-          this.mm.appendChild(linkEl);
-          this._haptic(0.28, 45);
-        },
-        deleteSelected() {
-          if (!this.selected || !this.mm) return;
-
+        deleteSelected(){
+          if (!this.selected || !this.data.mindmapRoot) return;
           const id = this.selected.id;
-          // remove links that reference this node
-          const toRemove = [];
-          this.mm.querySelectorAll('[dynamic-link]').forEach(el => {
-            const attr = el.getAttribute('dynamic-link');
-            const fromSel = attr?.from;
-            const toSel = attr?.to;
-            const fromId = typeof fromSel === 'string' ? fromSel.replace('#','') : (fromSel?.id ?? '');
-            const toId   = typeof toSel === 'string' ? toSel.replace('#','') : (toSel?.id ?? '');
-            if (fromId === id || toId === id) toRemove.push(el);
+
+          // remove links referencing id
+          const root = this.data.mindmapRoot;
+          root.querySelectorAll('[link-tube]').forEach(el=>{
+            const from = el.getAttribute('data-from');
+            const to = el.getAttribute('data-to');
+            if (from === id || to === id){
+              el.parentNode && el.parentNode.removeChild(el);
+            }
           });
-          toRemove.forEach(el => el.parentNode && el.parentNode.removeChild(el));
 
           // remove node
           const gone = this.selected;
           this.selected = null;
           this.linkFrom = null;
-          if (this.selectionRing) this.selectionRing.setTarget(null);
+          if (this.ringComp) this.ringComp.setTarget(null);
 
           gone.parentNode && gone.parentNode.removeChild(gone);
-          this._haptic(0.4, 70);
+
+          this.updateToolStatus();
+          this.haptic(this.data.rightHand, 0.4, 70);
+        },
+
+        addNode(){
+          const root = this.data.mindmapRoot;
+          if (!root) return;
+
+          const id = niceId('n');
+          const palette = ['#00F0FF','#FF4FD8','#7CFF6B','#FFD24D','#9B7CFF'];
+          const color = palette[Math.floor(Math.random()*palette.length)];
+          const label = ['Idea','Note','Task','Branch','Signal','Edge'][Math.floor(Math.random()*6)];
+
+          // spawn near selected, else in front of camera
+          let spawn = new THREE.Vector3();
+          if (this.selected){
+            const selW = getWorldPos(this.selected, this._tmp);
+            const camPos = getWorldPos(document.querySelector('#camera'), this._tmp2);
+            spawn.copy(selW).add(selW.clone().sub(camPos).normalize().multiplyScalar(0.65));
+            spawn.x += rand(-0.15, 0.15);
+            spawn.y += rand(-0.10, 0.15);
+            spawn.z += rand(-0.15, 0.15);
+          } else {
+            const cam = document.querySelector('#camera');
+            const camPos = getWorldPos(cam, this._tmp2);
+            const dir = new THREE.Vector3();
+            cam.object3D.getWorldDirection(dir);
+            dir.y = 0; dir.normalize();
+            spawn.copy(camPos).add(dir.multiplyScalar(1.6));
+            spawn.y = 1.55;
+          }
+
+          // convert world to root local
+          const local = spawn.clone();
+          root.object3D.worldToLocal(local);
+
+          const nodeEl = document.createElement('a-entity');
+          nodeEl.setAttribute('id', id);
+          nodeEl.setAttribute('position', `${local.x.toFixed(3)} ${local.y.toFixed(3)} ${local.z.toFixed(3)}`);
+          nodeEl.setAttribute('mind-node', `label: ${label}; color: ${color}; size: 0.15`);
+          root.appendChild(nodeEl);
+
+          if (this.selected){
+            this.createLink(this.selected, nodeEl, color);
+          }
+
+          this.selectNode(nodeEl);
+        },
+
+        createLink(fromEl, toEl, color='#00F0FF'){
+          const root = this.data.mindmapRoot;
+          if (!root || !fromEl || !toEl) return;
+
+          // avoid duplicates (simple)
+          const exists = !!root.querySelector(`[data-from="${fromEl.id}"][data-to="${toEl.id}"]`);
+          if (exists) return;
+
+          const linkEl = document.createElement('a-entity');
+          linkEl.classList.add('link');
+          linkEl.setAttribute('link-tube', `from: #${fromEl.id}; to: #${toEl.id}; color: ${color}; thickness: 0.012; opacity: 0.9`);
+          linkEl.setAttribute('data-from', fromEl.id);
+          linkEl.setAttribute('data-to', toEl.id);
+          root.appendChild(linkEl);
+        },
+
+        openRename(){
+          if (!this.selected || !this.keyboardComp) return;
+          this.keyboardComp.openFor(this.selected);
+        },
+
+        exportJSON(){
+          const root = this.data.mindmapRoot;
+          if (!root) return;
+
+          const nodes = [];
+          root.querySelectorAll('.node').forEach(n=>{
+            const pos = n.getAttribute('position');
+            const label = getNodeLabel(n) || n.id;
+            const nodeAttr = n.getAttribute('mind-node');
+            nodes.push({
+              id: n.id,
+              label,
+              pos: [pos.x, pos.y, pos.z],
+              color: nodeAttr?.color || '#00F0FF',
+              size: nodeAttr?.size || 0.16
+            });
+          });
+
+          const links = [];
+          root.querySelectorAll('[link-tube]').forEach(l=>{
+            links.push({
+              from: l.getAttribute('data-from'),
+              to: l.getAttribute('data-to'),
+              color: l.getAttribute('link-tube')?.color || '#00F0FF',
+              thickness: l.getAttribute('link-tube')?.thickness || 0.012
+            });
+          });
+
+          const obj = { nodes, links };
+
+          // write into script + textarea (desktop)
+          const script = document.getElementById('mindmap-json');
+          script.textContent = JSON.stringify(obj, null, 2);
+
+          const box = document.getElementById('jsonBox');
+          box.value = script.textContent;
+
+          // small haptic confirm
+          this.haptic(this.data.rightHand, 0.25, 45);
+        },
+
+        maybeStartWorldMode(){
+          if (this.worldMode) return;
+          if (!(this.aHeld && this.xHeld)) return;
+
+          // stop any current grabs
+          this.grab.left = null;
+          this.grab.right = null;
+
+          this.worldMode = true;
+
+          const ws = this.data.workspace;
+          const lh = this.data.leftHand;
+          const rh = this.data.rightHand;
+
+          const lp = getWorldPos(lh, this._tmp);
+          const rp = getWorldPos(rh, this._tmp2);
+
+          const mid = lp.clone().add(rp).multiplyScalar(0.5);
+          const vec = rp.clone().sub(lp); vec.y = 0;
+
+          this._wm.startDist = Math.max(0.0001, lp.distanceTo(rp));
+          this._wm.startScale.copy(ws.object3D.scale);
+          this._wm.startRotY = ws.object3D.rotation.y;
+          this._wm.startPos.copy(ws.object3D.position);
+          this._wm.startMid.copy(mid);
+          this._wm.startVec.copy(vec);
+
+          this.haptic(lh, 0.3, 60);
+          this.haptic(rh, 0.3, 60);
+        },
+
+        stopWorldModeIfNeeded(){
+          if (!this.worldMode) return;
+          if (this.aHeld && this.xHeld) return;
+          this.worldMode = false;
+        },
+
+        tick(){
+          // drag nodes
+          const root = this.data.mindmapRoot;
+          const ws = this.data.workspace;
+
+          // two-hand world manipulation (A+X held)
+          if (this.worldMode){
+            const lh = this.data.leftHand;
+            const rh = this.data.rightHand;
+
+            const lp = getWorldPos(lh, this._tmp);
+            const rp = getWorldPos(rh, this._tmp2);
+
+            // scale
+            const dist = Math.max(0.0001, lp.distanceTo(rp));
+            const scaleFactor = dist / this._wm.startDist;
+            const s = clamp(this._wm.startScale.x * scaleFactor, 0.20, 4.0);
+            ws.object3D.scale.set(s, s, s);
+
+            // rotate around Y using hand vector angle
+            const curVec = rp.clone().sub(lp); curVec.y = 0;
+            const a0 = Math.atan2(this._wm.startVec.z, this._wm.startVec.x);
+            const a1 = Math.atan2(curVec.z, curVec.x);
+            const dA = (a1 - a0);
+            ws.object3D.rotation.y = this._wm.startRotY + dA;
+
+            // pan by midpoint delta
+            const mid = lp.clone().add(rp).multiplyScalar(0.5);
+            const delta = mid.clone().sub(this._wm.startMid);
+            ws.object3D.position.copy(this._wm.startPos).add(delta);
+
+            return;
+          }
+
+          // node drag follow (grip)
+          for (const hand of ['left','right']){
+            const node = this.grab[hand];
+            if (!node) continue;
+
+            const handEl = (hand === 'left') ? this.data.leftHand : this.data.rightHand;
+            const handW = getWorldPos(handEl, this._tmp);
+            const desiredW = handW.clone().add(this.grabOffset[hand]);
+
+            // move node in root local coordinates (root may be scaled/rotated via workspace)
+            const local = desiredW.clone();
+            root.object3D.worldToLocal(local);
+            node.setAttribute('position', `${local.x} ${local.y} ${local.z}`);
+          }
         }
       });
 
       // ----------------------------
-      // Desktop JSON editor wiring
+      // Bridge UI buttons -> interaction actions
+      // ----------------------------
+      (function wireUI(){
+        const rig = document.querySelector('#rig');
+        const getInteraction = () => rig?.components?.interaction;
+
+        document.addEventListener('click', (e)=>{
+          // ignore normal dom clicks
+        });
+
+        // attach click handlers to A-Frame ui buttons via event delegation
+        const scene = document.querySelector('a-scene');
+        scene.addEventListener('loaded', ()=>{
+          scene.querySelectorAll('[ui-button]').forEach(btn=>{
+            btn.addEventListener('click', ()=>{
+              const ia = getInteraction();
+              if (!ia) return;
+
+              const action = btn.getAttribute('ui-button')?.action;
+              if (action === 'add') ia.addNode();
+              else if (action === 'link') ia.toggleLinkMode();
+              else if (action === 'delete') ia.deleteSelected();
+              else if (action === 'rename') ia.openRename();
+              else if (action === 'export') ia.exportJSON();
+
+              ia.updateToolStatus();
+            });
+          });
+        });
+      })();
+
+      // ----------------------------
+      // Desktop JSON editor
       // ----------------------------
       (function setupJSONEditor(){
         const toggleBtn = document.getElementById('toggleJson');
         const applyBtn = document.getElementById('applyJson');
+        const exportBtn = document.getElementById('exportJson');
         const box = document.getElementById('jsonBox');
         const jsonScript = document.getElementById('mindmap-json');
-
         const mmRoot = document.getElementById('mindmapRoot');
 
         const syncFromScript = () => { box.value = jsonScript.textContent.trim(); };
-        const applyToScene = () => {
+
+        toggleBtn.addEventListener('click', () => {
+          const open = box.style.display !== 'none';
+          box.style.display = open ? 'none' : 'block';
+          if (!open) syncFromScript();
+        });
+
+        applyBtn.addEventListener('click', () => {
           try {
             const parsed = JSON.parse(box.value);
             jsonScript.textContent = JSON.stringify(parsed, null, 2);
@@ -785,15 +1291,13 @@
           } catch(e) {
             alert('JSON error:\n' + e.message);
           }
-        };
-
-        toggleBtn.addEventListener('click', () => {
-          const open = box.style.display !== 'none';
-          box.style.display = open ? 'none' : 'block';
-          if (!open) syncFromScript();
         });
 
-        applyBtn.addEventListener('click', applyToScene);
+        exportBtn.addEventListener('click', () => {
+          const ia = document.querySelector('#rig')?.components?.interaction;
+          ia?.exportJSON();
+          box.style.display = 'block';
+        });
       })();
     </script>
   </a-scene>
