@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- Bootstrap как в официальном примере -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+        integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+        crossorigin="anonymous">
+
+  <!-- ВАЖНО: официальный include -->
+  <script src="https://noda.io/api/includes/noda.js"></script>
+
+  <title>Noda Log → Graph Import</title>
+
+  <style>
+    h1 { font-size: medium; }
+    body { padding: 20px; }
+    .status.error { background-color: rgb(241, 169, 169); }
+    .status.success { background-color: rgb(189, 235, 189); }
+    .status { margin: 15px 0; padding: 10px; background-color: bisque; height: 75px; overflow-y:auto; }
+    .status p { margin-bottom: 0; }
+    .status span { font-size: 80%; font-weight: bold; }
+
+    .events { margin: 15px 0; padding: 10px; background-color: blanchedalmond; height: 160px; overflow-y:auto; }
+    .events #eventsMessage { font-family: monospace; font-size: 85%; }
+
+    .crud-form { padding: 15px; background-color: aliceblue; }
+    .crud-form textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
+    .small { font-size: 12px; opacity: .85; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  </style>
+
+  <script>
+    // ----------------------------
+    // UI helpers (как в starter)
+    // ----------------------------
+    let statusElement, statusMessageElement, eventsMessageElement;
+
+    function statusSuccess(message) {
+      statusMessageElement.textContent = message;
+      statusElement.classList.remove('error');
+      statusElement.classList.add('success');
+    }
+
+    function statusError(message) {
+      statusMessageElement.textContent = message;
+      statusElement.classList.add('error');
+      statusElement.classList.remove('success');
+    }
+
+    function eventMessage(message) {
+      eventsMessageElement.innerHTML = message + "<br/>" + eventsMessageElement.innerHTML;
+    }
+
+    function clearEvents() {
+      eventsMessageElement.innerHTML = "";
+    }
+
+    // ----------------------------
+    // Parsing / heuristics
+    // ----------------------------
+    const SESSION_TAG = "LOG_IMPORT_V1";
+    let createdNodeUuids = [];
+    let createdLinkUuids = [];
+
+    function extractFirstUrl(text) {
+      const m = text.match(/https?:\/\/\S+/i);
+      if (!m) return null;
+      return m[0].replace(/[),.;]+$/g, "");
+    }
+
+    function severityFromText(text) {
+      const t = (text || "").toLowerCase();
+
+      // money / billing
+      if (t.includes("нехватки средств") || t.includes("закончились") || t.includes("spend limit") || t.includes("оплат")) {
+        return { type: "money", color: "FFB020", shape: "Diamond", size: 9 };
+      }
+      // network / infra
+      if (t.includes("ehostunreach") || t.includes("timeout") || t.includes("connection") || t.includes("nvidia-broken")) {
+        return { type: "network", color: "FF4D6D", shape: "Star", size: 10 };
+      }
+      // stuck / queue
+      if (t.includes("подвис") || t.includes("завис") || t.includes("очеред") || t.includes("deployment disabled")) {
+        return { type: "stuck", color: "8B5CF6", shape: "Hourglass", size: 9 };
+      }
+      // errors / http statuses
+      if (t.includes(" error") || t.includes("failed") || t.includes("403") || t.includes("422") || t.includes("406")) {
+        return { type: "error", color: "FF4D4D", shape: "Tetra", size: 9 };
+      }
+      // limits
+      if (t.includes("лимит") || t.includes("превышен")) {
+        return { type: "limit", color: "22C55E", shape: "Plus", size: 8 };
+      }
+
+      return { type: "info", color: "60A5FA", shape: "Box", size: 8 };
+    }
+
+    function parseTsvLogs(text) {
+      const lines = (text || "")
+        .split("\n")
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const items = [];
+      for (const line of lines) {
+        const parts = line.split("\t");
+        if (parts.length < 2) continue;
+
+        const ts = parts[0].trim();
+        const msg = parts.slice(1).join("\t").trim();
+
+        const date = new Date(ts);
+        if (Number.isNaN(date.getTime())) continue;
+
+        items.push({ ts, date, msg });
+      }
+
+      items.sort((a, b) => a.date - b.date);
+      return items;
+    }
+
+    function buildTimelineLayout(items) {
+      const min = items[0]?.date?.getTime() ?? Date.now();
+      const max = items[items.length - 1]?.date?.getTime() ?? min;
+      const span = Math.max(1, max - min);
+
+      // Параметры раскладки в VR-метрах
+      const X_SPAN = 6.5;     // ширина таймлайна
+      const ROWS = 7;         // "решётка" по Z
+      const Z_STEP = 0.55;
+      const Y = 1.35;
+
+      return items.map((it, idx) => {
+        const xNorm = (it.date.getTime() - min) / span;
+        const x = -X_SPAN / 2 + xNorm * X_SPAN;
+
+        const row = idx % ROWS;
+        const z = -(Math.floor(ROWS / 2) * Z_STEP) + row * Z_STEP;
+
+        return { ...it, pos: { x, y: Y, z } };
+      });
+    }
+
+    // ----------------------------
+    // Noda lifecycle & events
+    // ----------------------------
+    document.addEventListener('DOMContentLoaded', function () {
+      statusElement = document.getElementById('status');
+      statusMessageElement = document.getElementById('statusMessage');
+      eventsMessageElement = document.getElementById('eventsMessage');
+
+      window.noda.onNodeCreated = (node) => eventMessage("Node created: " + node.uuid);
+      window.noda.onNodeUpdated = (node) => eventMessage("Node updated: " + node.uuid);
+      window.noda.onNodeDeleted = (node) => eventMessage("Node deleted: " + node.uuid);
+
+      window.noda.onLinkCreated = (link) => eventMessage("Link created: " + link.uuid);
+      window.noda.onLinkUpdated = (link) => eventMessage("Link updated: " + link.uuid);
+      window.noda.onLinkDeleted = (link) => eventMessage("Link deleted: " + link.uuid);
+
+      window.noda.onInitialized = function () {
+        if (!window.noda.isInstalled()) {
+          statusError("Noda VR context not found. Open this page inside Noda Browser.");
+          return;
+        }
+        populateUser().catch(err => statusError("Get User error: " + err));
+      }
+    }, false);
+
+    async function populateUser() {
+      const user = await window.noda.getUser(); // 
+      document.getElementById('userId').textContent = user.userId;
+      statusSuccess("Ready. Noda WebAPI initialized.");
+    }
+
+    // ----------------------------
+    // Actions
+    // ----------------------------
+    async function importLogsAsGraph() {
+      try {
+        const raw = document.getElementById("logInput").value;
+        const items = parseTsvLogs(raw);
+        if (!items.length) {
+          statusError("Nothing parsed. Expect lines: ISO_DATETIME<TAB>message");
+          return;
+        }
+
+        // На всякий случай: чистим "прошлый импорт" (по кнопке отдельно тоже есть)
+        createdNodeUuids = [];
+        createdLinkUuids = [];
+
+        const laid = buildTimelineLayout(items);
+
+        // Создаём ноды
+        for (let i = 0; i < laid.length; i++) {
+          const it = laid[i];
+          const sev = severityFromText(it.msg);
+          const url = extractFirstUrl(it.msg);
+
+          const uuid = `log:${it.ts}:${i}`;
+          const title = (it.msg.length > 70) ? (it.msg.slice(0, 67) + "…") : it.msg;
+
+          const nodeProps = {
+            uuid,
+            title,
+            color: sev.color,
+            opacity: 1,
+            shape: sev.shape,
+            notes:
+              `${SESSION_TAG}\n` +
+              `ts=${it.ts}\n` +
+              `type=${sev.type}\n\n` +
+              it.msg,
+            pageUrl: url || "",
+            size: sev.size,
+            location: {
+              x: it.pos.x,
+              y: it.pos.y,
+              z: it.pos.z,
+              relativeTo: "Origin"
+            }
+          };
+
+          const node = await window.noda.createNode(nodeProps); // 
+          createdNodeUuids.push(node.uuid);
+        }
+
+        // Создаём связи "по времени"
+        for (let i = 0; i < createdNodeUuids.length - 1; i++) {
+          const fromUuid = createdNodeUuids[i];
+          const toUuid = createdNodeUuids[i + 1];
+
+          const linkProps = {
+            uuid: `link:${fromUuid}→${toUuid}`,
+            fromUuid,
+            toUuid,
+            title: "next",
+            color: "D7D7D7",
+            shape: "Dash",
+            size: 2,
+            curve: "None",
+            trail: "Ring",
+            selected: false
+          };
+
+          const link = await window.noda.createLink(linkProps); // 
+          createdLinkUuids.push(link.uuid);
+        }
+
+        statusSuccess(`Imported ${createdNodeUuids.length} nodes, ${createdLinkUuids.length} links.`);
+      } catch (error) {
+        statusError("Import error: " + error);
+      }
+    }
+
+    async function clearImported() {
+      try {
+        // Сначала ссылки
+        for (const uuid of createdLinkUuids) {
+          try { await window.noda.deleteLink({ uuid }); } catch (e) {}
+        }
+        // Потом ноды
+        for (const uuid of createdNodeUuids) {
+          try { await window.noda.deleteNode({ uuid }); } catch (e) {}
+        }
+
+        createdLinkUuids = [];
+        createdNodeUuids = [];
+
+        statusSuccess("Imported items cleared.");
+      } catch (error) {
+        statusError("Clear error: " + error);
+      }
+    }
+
+    // Map helpers как в официальном примере 
+    let savedMapJsonText = null;
+
+    async function saveMap() {
+      try {
+        const result = await window.noda.saveJson();
+        savedMapJsonText = result.jsonString;
+        statusSuccess("Map saved (JSON captured in page memory).");
+      } catch (error) {
+        statusError("Save Map error: " + error);
+      }
+    }
+
+    async function loadMap() {
+      try {
+        if (!savedMapJsonText) {
+          statusError("No saved JSON yet. Click Save Map first.");
+          return;
+        }
+        await window.noda.loadJson({ jsonString: savedMapJsonText });
+        statusSuccess("Map loaded from saved JSON.");
+      } catch (error) {
+        statusError("Load Map error: " + error);
+      }
+    }
+
+    async function clearMap() {
+      try {
+        await window.noda.clearMap();
+        statusSuccess("Map cleared.");
+      } catch (error) {
+        statusError("Clear Map error: " + error);
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <h1>Noda Log → Graph Import (User: <span id="userId" class="mono"></span>)</h1>
+
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-7">
+        <div class="crud-form">
+          <h2>Input logs (TSV)</h2>
+          <div class="small mb-2">
+            Формат строки: <span class="mono">ISO_DATETIME<TAB>message</span>.
+            Ноды раскладываются как таймлайн по X и “решёткой” по Z.
+          </div>
+
+          <textarea id="logInput" class="form-control" rows="16"></textarea>
+
+          <div class="mt-3">
+            <input type="button" class="btn btn-primary" value="Import logs → timeline graph" onclick="importLogsAsGraph()" />
+            <input type="button" class="btn btn-outline-secondary" value="Clear imported" onclick="clearImported()" />
+          </div>
+
+          <hr/>
+
+          <h2>Map</h2>
+          <div class="small mb-2">
+            Save/Load работает через JSON, который хранится в памяти страницы (после перезагрузки страницы пропадёт).
+          </div>
+          <p>
+            <input type="button" class="btn btn-success" value="Save Map" onclick="saveMap()" />
+            <input type="button" class="btn btn-info" value="Load Map" onclick="loadMap()" />
+            <input type="button" class="btn btn-danger" value="Clear Map" onclick="clearMap()" />
+          </p>
+        </div>
+      </div>
+
+      <div class="col-5">
+        <div id="status" class="status success">
+          <p>Status: <span id="statusMessage"></span></p>
+        </div>
+
+        <div id="events" class="events">
+          <p>
+            Events:
+            <span style="float:right;margin-right:10px">
+              <a href="#" onclick="clearEvents()">Clear</a>
+            </span>
+            <br/>
+            <span id="eventsMessage"></span>
+          </p>
+        </div>
+
+        <div class="small">
+          Подсказка по типам (эвристика):
+          <ul class="mb-0">
+            <li><b>money</b> → Diamond (жёлтый)</li>
+            <li><b>network</b> → Star (красно-розовый)</li>
+            <li><b>stuck/queue</b> → Hourglass (фиолетовый)</li>
+            <li><b>error</b> → Tetra (красный)</li>
+            <li><b>limit</b> → Plus (зелёный)</li>
+            <li><b>info</b> → Box (синий)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Заполним textarea твоим примером при первом открытии
+    document.addEventListener("DOMContentLoaded", () => {
+      const ta = document.getElementById("logInput");
+      if (ta && !ta.value.trim()) {
+        ta.value =
+`2025-11-20T23:00:14.078Z\tv4 остановилось из-за нехватки средств на openai
+2025-11-20T23:14:27.159Z\tpod3 Error: Channel closed by server 406 PRECONDITION-FAILED delivery acknowledgement timed out 10800000 ms
+2025-11-22T13:27:14.245Z\tподвисла обработка видео — скрипт 2, не было ссылки, произошло 2 раза
+2025-11-22T16:35:03.776Z\tv7 выдал ошибку на нормальной фотке, пример: https://storage.yandexcloud.net/colorize/colorize/6de9ed2db6e1ba1fc31abbc2073999a2/5249e678e14e03159a2deec0b915a0fa.jpeg
+2025-11-23T16:27:07.583Z\tу пользователя ziriaell@gmail.com превышен лимит: 50, использовано: 69
+2025-12-17T08:32:13.298Z\tv7 опять подвисла`;
+      }
+    });
+  </script>
+</body>
+</html>
