@@ -2,329 +2,432 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Noda Smoke Test (super verbose + bridge debug)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>A-Frame WebXR Blocks Demo</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
+  <!-- Nice environment in 1 line -->
+  <script src="https://unpkg.com/aframe-environment-component@1.5.0/dist/aframe-environment-component.min.js"></script>
 
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 16px; }
-    .box { border: 1px solid #ddd; border-radius: 12px; padding: 12px; margin: 10px 0; }
-    .ok { background:#e9fbe9; }
-    .bad { background:#ffe9e9; }
-    .mono { font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; }
-    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #999; background:#f7f7f7; cursor:pointer; margin-right: 8px; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; }
-    .small { font-size: 12px; opacity: 0.85; }
+    html, body { margin:0; height:100%; background:#0b1020; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    #hud {
+      position: fixed; left: 14px; top: 14px; z-index: 10;
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      padding: 10px 12px; border-radius: 14px;
+      background: rgba(10, 14, 28, 0.55);
+      border: 1px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      color: rgba(255,255,255,0.9);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+    #hud button {
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.10);
+      color: rgba(255,255,255,0.95);
+      padding: 10px 12px; border-radius: 12px;
+      cursor: pointer;
+    }
+    #hud button:hover { background: rgba(255,255,255,0.16); }
+    #hud .hint { font-size: 13px; opacity: 0.85; line-height: 1.2; }
+    #hud kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      padding: 2px 7px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.25);
+      margin: 0 2px;
+    }
   </style>
-
-  <!-- локальный noda.js -->
-  <script
-    src="./noda.js"
-    onload="window.__nodaJsLoaded=true; window.__log('✅ noda.js loaded');"
-    onerror="window.__nodaJsError=true; window.__log('❌ noda.js failed to load');"
-  ></script>
-
-  <script>
-    function $(id){ return document.getElementById(id); }
-
-    function setBox(id, ok, html) {
-      const el = $(id);
-      el.className = "box " + (ok ? "ok" : "bad");
-      el.innerHTML = html;
-    }
-
-    function nowTs() {
-      const d = new Date();
-      const pad = (n) => String(n).padStart(2, "0");
-      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,"0")}`;
-    }
-
-    function __log(msg) {
-      const el = $("log");
-      if (!el) return;
-      el.textContent = `[${nowTs()}] ${msg}\n` + el.textContent;
-      el.textContent = el.textContent.slice(0, 30000);
-    }
-    window.__log = __log;
-
-    function logClick(name) { __log(`🖱️ CLICK: ${name}`); }
-
-    function withTimeout(p, ms, label="timeout") {
-      return Promise.race([
-        p,
-        new Promise((_, rej) => setTimeout(() => rej(new Error(label)), ms))
-      ]);
-    }
-
-    function safeStringify(obj) {
-      try { return JSON.stringify(obj, null, 2); } catch (e) { return String(obj); }
-    }
-
-    function summarizeVuplex() {
-      const v = window.vuplex;
-      if (!v) return { present:false };
-      let keys = [];
-      try { keys = Object.keys(v); } catch (_) {}
-      return {
-        present: true,
-        type: typeof v,
-        keys,
-        hasPostMessage: typeof v.postMessage === "function",
-        hasAddEventListener: typeof v.addEventListener === "function"
-      };
-    }
-
-    function getNodaState() {
-      const jsLoaded = !!window.__nodaJsLoaded;
-      const jsError  = !!window.__nodaJsError;
-      const hasNoda  = !!window.noda;
-
-      let installed = null;
-      let installedOk = false;
-      if (hasNoda) {
-        try {
-          installed = window.noda.isInstalled();
-          installedOk = (installed === true);
-        } catch (e) {
-          installed = "ERR: " + String(e);
-        }
-      }
-      return { jsLoaded, jsError, hasNoda, installed, installedOk };
-    }
-
-    // ---- ACK tracking (важно!) ----
-    let lastNodeCreatedUuid = null;
-    function wireEvents() {
-      if (!window.noda) return;
-
-      window.noda.onInitialized = () => __log("EVENT onInitialized fired (from noda.js)");
-      window.noda.onNodeCreated = (n) => {
-        lastNodeCreatedUuid = n?.uuid ?? "(no uuid)";
-        __log("EVENT onNodeCreated uuid=" + lastNodeCreatedUuid);
-      };
-      window.noda.onNodeUpdated = (n) => __log("EVENT onNodeUpdated uuid=" + (n?.uuid ?? "(no uuid)"));
-      window.noda.onLinkCreated = (l) => __log("EVENT onLinkCreated uuid=" + (l?.uuid ?? "(no uuid)"));
-    }
-
-    // ---- Vuplex inbound logging ----
-    function wireVuplexDebug() {
-      // лог vuplexready
-      window.addEventListener("vuplexready", () => {
-        __log("🔥 EVENT vuplexready fired");
-        snapshot(); // обновим блоки
-      });
-
-      // если vuplex уже есть — повесим слушатель “сырого” сообщения (дополнительно к noda.js)
-      if (window.vuplex && typeof window.vuplex.addEventListener === "function") {
-        try {
-          window.vuplex.addEventListener("message", (event) => {
-            __log("⬅️ VUPLEX RAW: " + String(event.data));
-            try {
-              const parsed = JSON.parse(event.data);
-              __log("⬅️ VUPLEX JSON: " + safeStringify(parsed));
-            } catch (e) {
-              __log("⬅️ VUPLEX JSON parse ERROR: " + String(e));
-            }
-          });
-          __log("vuplex debug listener attached");
-        } catch (e) {
-          __log("vuplex debug listener attach ERROR: " + String(e));
-        }
-      } else {
-        __log("vuplex not ready for debug listener yet");
-      }
-    }
-
-    function snapshot() {
-      const st = getNodaState();
-      const vp = summarizeVuplex();
-
-      setBox("script", !st.jsError, `
-        <b>Script</b><br/>
-        loaded: <span class="mono">${st.jsLoaded}</span><br/>
-        error: <span class="mono">${st.jsError}</span>
-      `);
-
-      setBox("obj", st.hasNoda, `
-        <b>window.noda</b><br/>
-        exists: <span class="mono">${st.hasNoda}</span>
-      `);
-
-      setBox("ctx", st.installedOk, `
-        <b>VR context</b><br/>
-        isInstalled(): <span class="mono">${String(st.installed)}</span>
-      `);
-
-      setBox("vuplex", vp.present && vp.hasPostMessage, `
-        <b>Vuplex bridge</b><br/>
-        present: <span class="mono">${vp.present}</span><br/>
-        type: <span class="mono">${vp.type ?? "-"}</span><br/>
-        has postMessage: <span class="mono">${vp.hasPostMessage ?? false}</span><br/>
-        has addEventListener: <span class="mono">${vp.hasAddEventListener ?? false}</span><br/>
-        keys: <span class="mono">${(vp.keys ?? []).join(", ")}</span>
-      `);
-
-      const enabled = st.jsLoaded && st.hasNoda && st.installedOk && vp.present && vp.hasPostMessage;
-      $("btnClear").disabled = !enabled;
-      $("btnUser").disabled  = !enabled;
-      $("btnOne").disabled   = !enabled;
-      $("btnOrigin").disabled= !enabled;
-      $("btnList").disabled  = !enabled;
-    }
-
-    async function safeGetUser() {
-      logClick("getUser");
-      try {
-        __log("getUser() start…");
-        const user = await withTimeout(window.noda.getUser(null), 12000, "getUser timeout");
-        __log("getUser() result: " + safeStringify(user));
-        $("userJson").textContent = safeStringify(user);
-      } catch (e) {
-        __log("getUser ERROR: " + String(e));
-        $("userJson").textContent = "getUser ERROR: " + String(e);
-      }
-    }
-
-    async function listNodesVerbose() {
-      logClick("listNodes(null)");
-      try {
-        __log("listNodes(null) start…");
-        const res = await withTimeout(window.noda.listNodes(null), 20000, "listNodes timeout");
-        const count = (res && Array.isArray(res.nodes)) ? res.nodes.length : 0;
-        __log(`listNodes OK: count=${count}`);
-        $("nodesJson").textContent = safeStringify({ count, sample: res?.nodes?.slice?.(0, 3) ?? res });
-      } catch (e) {
-        __log("listNodes ERROR: " + String(e));
-        $("nodesJson").textContent = "listNodes ERROR: " + String(e);
-      }
-    }
-
-    async function clearMap() {
-      logClick("clearMap");
-      try {
-        __log("clearMap() start…");
-        await withTimeout(window.noda.clearMap(null), 20000, "clearMap timeout");
-        __log("clearMap OK");
-        setBox("status", true, `<b>Status</b><br/>Map cleared`);
-      } catch (e) {
-        __log("clearMap ERROR: " + String(e));
-        setBox("status", false, `<b>Status</b><br/>clearMap ERROR: <span class="mono">${String(e)}</span>`);
-      }
-    }
-
-    async function waitNodeCreatedAck(expectedUuid, ms=5000) {
-      const t0 = Date.now();
-      while (Date.now() - t0 < ms) {
-        if (lastNodeCreatedUuid === expectedUuid) return true;
-        await new Promise(r => setTimeout(r, 100));
-      }
-      return false;
-    }
-
-    async function createVisibleNode(relativeTo) {
-      logClick("createNode (" + relativeTo + ")");
-      try {
-        lastNodeCreatedUuid = null;
-
-        const uuid = "smoke:" + relativeTo.toLowerCase() + ":" + Date.now();
-        const payload = {
-          uuid,
-          title: "VISIBLE " + relativeTo + " y=1.3 z=-2.0",
-          color: "#F44336",
-          opacity: 1,
-          shape: "Box",
-          size: 45,
-          selected: true,
-          notes: "Expect to see a big flashing box. If not visible, check ACK + Vuplex inbound logs.",
-          location: { x: 0, y: 1.3, z: -2.0, relativeTo }
-        };
-
-        __log("createNode payload: " + safeStringify(payload));
-        __log("createNode start…");
-        const node = await withTimeout(window.noda.createNode(payload), 20000, "createNode timeout");
-        __log("createNode returned: " + safeStringify(node));
-
-        const ack = await waitNodeCreatedAck(uuid, 5000);
-        __log("ACK onNodeCreated for " + uuid + ": " + ack);
-
-        setBox("status", ack, `<b>Status</b><br/>
-          createNode returned OK<br/>
-          uuid: <span class="mono">${uuid}</span><br/>
-          onNodeCreated ACK: <span class="mono">${ack}</span>
-        `);
-
-      } catch (e) {
-        __log("createNode ERROR: " + String(e));
-        setBox("status", false, `<b>Status</b><br/>createNode ERROR: <span class="mono">${String(e)}</span>`);
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      __log("DOMContentLoaded");
-
-      // важно: повесить обработчики после загрузки noda.js
-      setTimeout(() => {
-        try {
-          wireEvents();
-          wireVuplexDebug();
-        } catch (e) {
-          __log("wiring ERROR: " + String(e));
-        }
-      }, 0);
-
-      setInterval(snapshot, 300);
-
-      // стартовый статус
-      setTimeout(() => {
-        const st = getNodaState();
-        if (st.jsLoaded && st.hasNoda) {
-          setBox("status", true, `<b>Status</b><br/>Ready (try getUser / createNode)`);
-        } else {
-          setBox("status", false, `<b>Status</b><br/>Not ready yet`);
-        }
-      }, 600);
-    });
-  </script>
 </head>
 
 <body>
-  <h2>Noda Smoke Test (super verbose + bridge debug)</h2>
-
-  <div id="script" class="box bad">…</div>
-  <div id="obj" class="box bad">…</div>
-  <div id="ctx" class="box bad">…</div>
-  <div id="vuplex" class="box bad">…</div>
-
-  <div id="status" class="box bad"><b>Status</b><br/>waiting…</div>
-
-  <div class="box">
-    <div class="row">
-      <button id="btnClear"  onclick="clearMap()">Clear map</button>
-      <button id="btnUser"   onclick="safeGetUser()">getUser()</button>
-      <button id="btnOne"    onclick="createVisibleNode('User')">Create node777 (relativeTo=User)</button>
-      <button id="btnOrigin" onclick="createVisibleNode('Origin')">Create node (relativeTo=Origin)</button>
-      <button id="btnList"   onclick="listNodesVerbose()">List nodes (null props)</button>
-    </div>
-    <div class="small" style="margin-top:8px;">
-      Ключевой индикатор: приходит ли <span class="mono">VUPLEX RAW</span> и <span class="mono">EVENT onNodeCreated</span>.
-      Если <span class="mono">createNode returned OK</span>, но ACK=false и нет входящих сообщений — мост не отвечает.
+  <!-- Desktop HUD (в VR не обязателен, но удобно тестить на ПК) -->
+  <div id="hud">
+    <button id="spawnBtn">Spawn block 🎲</button>
+    <button id="clearBtn">Clear</button>
+    <div class="hint">
+      VR: левый стик — ходьба, правый триггер — перетаскивать лучом.<br/>
+      Desktop: <kbd>WASD</kbd> + мышь (ЛКМ смотреть).
     </div>
   </div>
 
-  <div class="box">
-    <b>User JSON:</b>
-    <pre id="userJson" class="mono">—</pre>
-  </div>
+  <a-scene
+    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true"
+    vr-mode-ui="enabled: true"
+    background="color: #0b1020"
+    fog="type: exponential; density: 0.02; color: #0b1020">
 
-  <div class="box">
-    <b>Nodes JSON:</b>
-    <pre id="nodesJson" class="mono">—</pre>
-  </div>
+    <!-- Environment -->
+    <a-entity environment="
+      preset: forest;
+      dressing: trees;
+      dressingAmount: 28;
+      ground: hills;
+      groundYScale: 7;
+      groundColor: #1a2a2a;
+      groundColor2: #0f1a1a;
+      grid: none;
+      skyType: gradient;
+      skyColor: #0b1020;
+      horizonColor: #1a2450;
+      lightPosition: 0.6 1 0.2;
+      shadow: true;">
+    </a-entity>
 
-  <div class="box">
-    <b>Log</b>
-    <pre id="log" class="mono"></pre>
-  </div>
+    <!-- Some extra “pretty” props -->
+    <a-entity position="0 0 -6">
+      <a-torus-knot
+        position="0 2.1 0"
+        radius="0.55" radius-tubular="0.14"
+        segments-radial="128" segments-tubular="16"
+        material="metalness: 0.2; roughness: 0.25; color: #7aa7ff; emissive: #223366; emissiveIntensity: 0.4"
+        animation="property: rotation; to: 0 360 0; dur: 15000; loop: true; easing: linear">
+      </a-torus-knot>
+      <a-ring position="0 0.06 0" rotation="-90 0 0" radius-inner="1.6" radius-outer="1.75"
+              material="color:#2b3a5e; metalness:0.1; roughness:0.6; emissive:#10182a; emissiveIntensity:0.25"></a-ring>
+    </a-entity>
+
+    <!-- Light polish -->
+    <a-entity light="type: ambient; intensity: 0.28; color: #aab6ff"></a-entity>
+    <a-entity light="type: directional; intensity: 0.85; color: #e8f0ff" position="2 6 3"></a-entity>
+
+    <!-- Player rig -->
+    <a-entity id="rig" position="0 0 4">
+      <a-entity id="camera"
+        camera
+        look-controls="pointerLockEnabled: true"
+        wasd-controls="acceleration: 45"
+        position="0 1.65 0">
+      </a-entity>
+
+      <!-- Left hand: locomotion thumbstick -->
+      <a-entity id="leftHand"
+        hand-controls="hand: left"
+        raycaster="objects: .interactable, .ui; far: 12"
+        laser-controls="hand: left"
+        line="opacity: 0.35"
+        thumbstick-move="target: #rig; speed: 2.0">
+      </a-entity>
+
+      <!-- Right hand: laser grab -->
+      <a-entity id="rightHand"
+        hand-controls="hand: right"
+        raycaster="objects: .interactable, .ui; far: 12"
+        laser-controls="hand: right"
+        line="opacity: 0.8"
+        raygrab="spawnSelector: #spawnButton">
+      </a-entity>
+    </a-entity>
+
+    <!-- VR panel with a “Spawn” button -->
+    <a-entity id="vrPanel" position="0 1.25 1.25" rotation="0 180 0">
+      <a-plane width="0.85" height="0.32" radius="0.06"
+        material="color: #0f1730; opacity: 0.85; metalness: 0.0; roughness: 0.9"
+        shadow="receive: true">
+      </a-plane>
+
+      <a-entity id="spawnButton"
+        class="ui"
+        geometry="primitive: plane; width: 0.52; height: 0.18"
+        material="color: #203a8a; opacity: 0.95; metalness: 0.1; roughness: 0.35; emissive: #12235a; emissiveIntensity: 0.55"
+        position="0 0 0.01"
+        rounded="radius: 0.06">
+      </a-entity>
+
+      <a-text value="SPAWN"
+        align="center"
+        position="0 0 0.03"
+        width="2.2"
+        color="#eaf0ff">
+      </a-text>
+
+      <a-text value="Aim + Trigger"
+        align="center"
+        position="0 -0.13 0.03"
+        width="1.8"
+        opacity="0.75"
+        color="#cdd6ff">
+      </a-text>
+    </a-entity>
+
+    <!-- Blocks container -->
+    <a-entity id="blocks"></a-entity>
+
+    <!-- Helper component: rounded corners for button plane -->
+    <script>
+      // Tiny rounded plane helper (no external libs)
+      AFRAME.registerComponent('rounded', {
+        schema: { radius: { default: 0.08 } },
+        init() {
+          const el = this.el;
+          const geom = el.getObject3D('mesh')?.geometry;
+          // If geometry isn't ready yet, retry next frame.
+          if (!geom) return requestAnimationFrame(() => this.init());
+
+          // Replace plane geometry with a rounded shape mesh.
+          const w = el.getAttribute('geometry').width || 1;
+          const h = el.getAttribute('geometry').height || 1;
+          const r = Math.min(this.data.radius, Math.min(w, h) * 0.5);
+
+          const shape = new THREE.Shape();
+          const hw = w / 2, hh = h / 2;
+          shape.moveTo(-hw + r, -hh);
+          shape.lineTo(hw - r, -hh);
+          shape.quadraticCurveTo(hw, -hh, hw, -hh + r);
+          shape.lineTo(hw, hh - r);
+          shape.quadraticCurveTo(hw, hh, hw - r, hh);
+          shape.lineTo(-hw + r, hh);
+          shape.quadraticCurveTo(-hw, hh, -hw, hh - r);
+          shape.lineTo(-hw, -hh + r);
+          shape.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+
+          const newGeom = new THREE.ShapeGeometry(shape, 24);
+          const mesh = el.getObject3D('mesh');
+          mesh.geometry.dispose();
+          mesh.geometry = newGeom;
+        }
+      });
+
+      // Billboard (label always faces camera)
+      AFRAME.registerComponent('billboard', {
+        schema: { target: { type: 'selector', default: '#camera' } },
+        tick() {
+          const t = this.data.target;
+          if (!t) return;
+          const obj = this.el.object3D;
+          obj.lookAt(t.object3D.getWorldPosition(new THREE.Vector3()));
+        }
+      });
+
+      // Thumbstick locomotion for Quest (left controller)
+      AFRAME.registerComponent('thumbstick-move', {
+        schema: {
+          target: { type: 'selector' },
+          speed: { default: 2.0 },
+          deadzone: { default: 0.12 }
+        },
+        tick(t, dt) {
+          const target = this.data.target;
+          if (!target) return;
+
+          const tc = this.el.components['tracked-controls'];
+          const gp = tc && tc.controller;
+          if (!gp || !gp.axes || gp.axes.length < 2) return;
+
+          // Usually axes[0], axes[1] = primary thumbstick on that controller
+          let ax = gp.axes[0] || 0;
+          let ay = gp.axes[1] || 0;
+
+          // Deadzone
+          const dz = this.data.deadzone;
+          if (Math.abs(ax) < dz) ax = 0;
+          if (Math.abs(ay) < dz) ay = 0;
+          if (ax === 0 && ay === 0) return;
+
+          const rig = target.object3D;
+
+          // Move relative to camera yaw
+          const cam = document.querySelector('#camera');
+          const yaw = cam ? cam.object3D.rotation.y : 0;
+
+          const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+          const right   = new THREE.Vector3(1, 0,  0).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+
+          const move = new THREE.Vector3()
+            .addScaledVector(right, ax)
+            .addScaledVector(forward, -ay);
+
+          const seconds = (dt || 16) / 1000;
+          rig.position.addScaledVector(move, this.data.speed * seconds);
+        }
+      });
+
+      // Laser grab: aim at block, hold trigger, drag along ray
+      AFRAME.registerComponent('raygrab', {
+        schema: {
+          spawnSelector: { type: 'selector' },
+          maxDistance: { default: 10 }
+        },
+        init() {
+          this.grabbed = null;
+          this.grabDistance = 2.0;
+
+          this.onDown = this.onDown.bind(this);
+          this.onUp = this.onUp.bind(this);
+
+          // Trigger/grip for VR + mouse fallback
+          this.el.addEventListener('triggerdown', this.onDown);
+          this.el.addEventListener('gripdown', this.onDown);
+          this.el.addEventListener('triggerup', this.onUp);
+          this.el.addEventListener('gripup', this.onUp);
+
+          // Desktop fallback (if you attach this to camera later)
+          this.el.addEventListener('mousedown', this.onDown);
+          this.el.addEventListener('mouseup', this.onUp);
+        },
+
+        findTargetFromIntersection(intersection) {
+          if (!intersection || !intersection.object) return null;
+          let el = intersection.object.el;
+          while (el && el !== this.el.sceneEl) {
+            if (el.classList && (el.classList.contains('interactable') || el.classList.contains('ui'))) return el;
+            el = el.parentEl;
+          }
+          return null;
+        },
+
+        onDown() {
+          const rc = this.el.components.raycaster;
+          if (!rc || !rc.intersections || !rc.intersections.length) return;
+
+          const hit = rc.intersections[0];
+          const target = this.findTargetFromIntersection(hit);
+          if (!target) return;
+
+          // If it's the UI spawn button (or inside it), spawn instead of grabbing
+          const spawnBtn = this.data.spawnSelector;
+          if (spawnBtn && (target === spawnBtn || spawnBtn.contains(target))) {
+            window.spawnRandomBlock?.();
+            // Small visual feedback
+            spawnBtn.setAttribute('animation__pulse', 'property: scale; to: 1.08 1.08 1; dur: 90; dir: alternate; loop: 2; easing: easeOutQuad');
+            return;
+          }
+
+          // If target is a child, climb to root block if exists
+          let root = target;
+          while (root && root !== this.el.sceneEl) {
+            if (root.dataset && root.dataset.blockRoot === '1') break;
+            root = root.parentEl;
+          }
+          if (!root || root === this.el.sceneEl) root = target;
+
+          // Save grabbed
+          this.grabbed = root;
+          this.grabDistance = Math.min(hit.distance || 2.0, this.data.maxDistance);
+          root.setAttribute('animation__hover', 'property: scale; to: 1.03 1.03 1.03; dur: 120; easing: easeOutQuad');
+        },
+
+        onUp() {
+          if (!this.grabbed) return;
+          this.grabbed.removeAttribute('animation__hover');
+          this.grabbed = null;
+        },
+
+        tick() {
+          if (!this.grabbed) return;
+
+          const rc = this.el.components.raycaster;
+          if (!rc || !rc.raycaster) return;
+
+          const ray = rc.raycaster.ray;
+          const origin = ray.origin.clone();
+          const dir = ray.direction.clone().normalize();
+
+          const worldPoint = origin.add(dir.multiplyScalar(this.grabDistance));
+
+          // Convert world point into grabbed parent local space
+          const obj3d = this.grabbed.object3D;
+          const parent = obj3d.parent;
+          if (!parent) return;
+
+          parent.worldToLocal(worldPoint);
+          obj3d.position.copy(worldPoint);
+        }
+      });
+
+      // Random blocks spawner
+      const LABELS = [
+        "Вектор мыслей", "Внутренний компас", "Микро-страх", "Режим бога",
+        "Слой препятствий", "Фокус", "Идея", "Смысл", "План", "Поток",
+        "Гипотеза", "Эксперимент", "Инсайт", "Сигнал", "Действие"
+      ];
+
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const choice = (arr) => arr[(Math.random() * arr.length) | 0];
+
+      window.spawnRandomBlock = function () {
+        const scene = document.querySelector('a-scene');
+        const container = document.querySelector('#blocks');
+        const cam = document.querySelector('#camera');
+
+        const label = `${choice(LABELS)} #${((Math.random()*999)|0).toString().padStart(3,'0')}`;
+
+        // Spawn point: in front of camera, slightly random
+        const camPos = cam.object3D.getWorldPosition(new THREE.Vector3());
+        const camDir = new THREE.Vector3(0,0,-1).applyQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()));
+        const forward = camDir.clone().multiplyScalar(rand(1.6, 2.3));
+        const side = new THREE.Vector3(1,0,0).applyQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()))
+                    .multiplyScalar(rand(-0.8, 0.8));
+
+        const p = camPos.clone().add(forward).add(side);
+        p.y = rand(0.9, 1.5);
+
+        const w = rand(0.35, 0.65);
+        const h = rand(0.25, 0.55);
+        const d = rand(0.18, 0.38);
+
+        const hue = (Math.random() * 360) | 0;
+        const color = `hsl(${hue} 70% 60%)`;
+
+        const root = document.createElement('a-entity');
+        root.dataset.blockRoot = "1";
+        root.classList.add('interactable');
+        root.setAttribute('position', `${p.x.toFixed(3)} ${p.y.toFixed(3)} ${p.z.toFixed(3)}`);
+
+        // Box
+        const box = document.createElement('a-box');
+        box.setAttribute('width', w.toFixed(3));
+        box.setAttribute('height', h.toFixed(3));
+        box.setAttribute('depth', d.toFixed(3));
+        box.setAttribute('material', `color: ${color}; metalness: 0.15; roughness: 0.35; emissive: #0b1020; emissiveIntensity: 0.25`);
+        box.setAttribute('shadow', 'cast: true; receive: true');
+        root.appendChild(box);
+
+        // Label board (billboard)
+        const labelWrap = document.createElement('a-entity');
+        labelWrap.setAttribute('position', `0 ${(h/2 + 0.18).toFixed(3)} 0`);
+        labelWrap.setAttribute('billboard', 'target: #camera');
+
+        const plate = document.createElement('a-plane');
+        plate.setAttribute('width', Math.max(0.62, w + 0.22).toFixed(3));
+        plate.setAttribute('height', '0.18');
+        plate.setAttribute('material', 'color: #0f1730; opacity: 0.86; metalness: 0.0; roughness: 0.9');
+        plate.setAttribute('position', '0 0 0.01');
+        labelWrap.appendChild(plate);
+
+        const text = document.createElement('a-text');
+        text.setAttribute('value', label);
+        text.setAttribute('align', 'center');
+        text.setAttribute('width', '1.6');
+        text.setAttribute('color', '#eaf0ff');
+        text.setAttribute('position', '0 0 0.02');
+        labelWrap.appendChild(text);
+
+        root.appendChild(labelWrap);
+
+        // Slight appear animation
+        root.setAttribute('scale', '0.001 0.001 0.001');
+        root.setAttribute('animation__pop', 'property: scale; to: 1 1 1; dur: 140; easing: easeOutBack');
+
+        container.appendChild(root);
+      };
+
+      // Wire up HUD buttons
+      window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('spawnBtn').addEventListener('click', () => window.spawnRandomBlock());
+        document.getElementById('clearBtn').addEventListener('click', () => {
+          const c = document.querySelector('#blocks');
+          while (c.firstChild) c.removeChild(c.firstChild);
+        });
+
+        // Spawn a couple on start
+        setTimeout(() => window.spawnRandomBlock(), 300);
+        setTimeout(() => window.spawnRandomBlock(), 650);
+      });
+    </script>
+  </a-scene>
 </body>
 </html>
